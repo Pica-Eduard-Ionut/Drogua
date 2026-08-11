@@ -1,7 +1,28 @@
-Dragua.print("Hello from Lua!")
-Dragua.print("This message is coming from app.lua")
--- Dragua.printInt(5)
+Drogua.print("Hello from Lua!")
+Drogua.print("This message is coming from app.lua")
 
+-- testing routes
+Drogua.Routes.get("/test/get", {
+    method = "GET",
+    message = "GET works"
+})
 
-Dragua.addRoute("/drogua", "Testing lua route creation")
-Dragua.registerRoute("/custom", {message="test message", extra=10, float=10.125})
+Drogua.Routes.post("/test/post", {
+    method = "POST",
+    message = "POST works"
+})
+
+Drogua.Routes.put("/test/put", {
+    method = "PUT",
+    message = "PUT works"
+})
+
+Drogua.Routes.delete("/test/delete", {
+    method = "DELETE",
+    message = "DELETE works"
+})
+
+Drogua.Routes.patch("/test/patch", {
+    method = "PATCH",
+    message = "PATCH works"
+})

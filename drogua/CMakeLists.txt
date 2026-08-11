@@ -36,7 +36,12 @@ endif ()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(${PROJECT_NAME} main.cc)
+# include all binding files
+file(GLOB LUA_BINDINGS
+    "${CMAKE_CURRENT_SOURCE_DIR}/lua_bindings/*.cc"
+)
+
+add_executable(${PROJECT_NAME} main.cc ${LUA_BINDINGS})
 
 # added by me to make it take the local libs in the /lib
 set_target_properties(${PROJECT_NAME} PROPERTIES
