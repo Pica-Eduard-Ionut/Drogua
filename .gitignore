@@ -2,3 +2,8 @@
 /drogua/build/
 # Runtime/shared libraries generated during build
 /drogua/lib/
+
+
+# personal scripts to automate running the project and reseting perms
+run.sh
+reset.sh
