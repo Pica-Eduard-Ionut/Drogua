@@ -1,0 +1,13 @@
+FROM alpine:3.14.10
+
+WORKDIR /app
+
+COPY build/drogua /app/drogua
+COPY lib/ /app/lib/
+COPY app.lua /app/app.lua
+
+RUN chmod +x /app/drogua
+
+EXPOSE 5555
+
+CMD ["/app/drogua"]

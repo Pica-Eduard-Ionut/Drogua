@@ -1,0 +1,4 @@
+# Build output
+/drogua/build/
+# Runtime/shared libraries generated during build
+/drogua/lib/

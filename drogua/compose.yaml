@@ -1,0 +1,9 @@
+services:
+  drogua:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: drogua
+    ports:
+      - "8080:5555"
+    restart: unless-stopped
