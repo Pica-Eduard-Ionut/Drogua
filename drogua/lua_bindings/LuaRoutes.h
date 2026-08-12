@@ -1,7 +1,6 @@
 #include <drogon/drogon.h>
 #include <lua.hpp>
 #include <LuaBridge/LuaBridge.h>
-#include <lua_bindings/LuaRequest.h>
 
 class LuaRoutes {
 public:
@@ -16,8 +15,9 @@ private:
     static void registerRoute(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler);
 
     static Json::Value executeHandler(const luabridge::LuaRef& handler);
-    static Json::Value executeLuaFunction(const luabridge::LuaRef& handler);
+    static Json::Value executeHandler(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr &req);
     static Json::Value executeLuaTable(const luabridge::LuaRef& handler);
+    static Json::Value executeLuaFunction(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req);
 
     static void sendJsonResponse(const Json::Value& json, std::function<void(const drogon::HttpResponsePtr&)>&& callback);
     static void sendErrorResponse(const std::string& message, std::function<void(const drogon::HttpResponsePtr&)>&& callback);

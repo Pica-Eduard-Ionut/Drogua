@@ -26,3 +26,23 @@ Drogua.Routes.patch("/test/patch", {
     method = "PATCH",
     message = "PATCH works"
 })
+
+Drogua.Routes.get("/user", function() 
+    return {
+        message = "test"
+    }
+end)
+
+local users = { [1] = "Marian", [2] = "Iulia"}
+
+-- currently working using Query params (?name=value)
+Drogua.Routes.get("/user", function(req)
+    local id = tonumber(req:param("id"))
+    local t = req:params()
+
+    return {
+        id = tostring(id),
+        user = users[id],
+        params = t
+    }
+end)
