@@ -46,3 +46,19 @@ Drogua.Routes.get("/user", function(req)
         params = t
     }
 end)
+
+Drogua.Routes.get("/user/{id}", function(req, id)
+    return {
+        id = id,
+        user = users[tonumber(id)]
+    }
+end)
+
+-- testing more params
+Drogua.Routes.get("/param/{id}/1/{test}/{other}", function(req, id, test, other)
+    return {
+        id = id,
+        test = test,
+        other = other
+    }
+end)
