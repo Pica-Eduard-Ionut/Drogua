@@ -62,3 +62,81 @@ Drogua.Routes.get("/param/{id}/1/{test}/{other}", function(req, id, test, other)
         other = other
     }
 end)
+
+-- testing new methods
+
+Drogua.Routes.get("/test/request/{id}", function(req, id)
+
+    print("========== REQUEST TEST ==========")
+
+    -- Request metadata
+    print("method:", req:method())
+    print("path:", req:path())
+    print("secure:", req:secure())
+    print("ip:", req:ip())
+
+    -- Route parameter
+    print("id argument:", id)
+    print("id via query():", req:query("id"))
+    print("all queryParams():")
+    local params = req:queryParams()
+    for k,v in pairs(params) do
+        print(" |-> key: " .. k .. " -> " .. v)
+    end
+
+    -- Headers
+    print("User-Agent:", req:header("User-Agent"))
+    print("Content-Type:", req:header("Content-Type"))
+
+    print("all headers:")
+    for key, value in pairs(req:headers()) do
+        print("  ", key, "=", value)
+    end
+
+    -- Cookies
+    print("session cookie:", req:cookie("session"))
+
+    print("all cookies:")
+    for key, value in pairs(req:cookies()) do
+        print("  ", key, "=", value)
+    end
+
+    -- Body
+    print("body:")
+    print(req:body())
+
+    -- JSON
+    local json = req:json()
+
+    if json then
+        print("JSON:")
+
+        for key, value in pairs(json) do
+            print("  ", key, "=", value, "type:", type(value))
+        end
+
+        if json.user then
+            print("JSON user:")
+            print("  name:", json.user.name)
+            print("  age:", json.user.age)
+            print("  active:", json.user.active)
+        end
+    else
+        print("No JSON body")
+    end
+
+    print("==================================")
+
+    return {
+        status = 200,
+        body = {
+            ok = true,
+            message = "LuaRequest works!",
+            id = id,
+            method = req:method(),
+            path = req:path(),
+            ip = req:ip(),
+            secure = req:secure()
+        }
+    }
+end)

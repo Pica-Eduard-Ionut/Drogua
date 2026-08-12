@@ -35,8 +35,9 @@ int main() {
     // LuaBridge3 registration
     luabridge::getGlobalNamespace(L)
     .beginNamespace("Drogua")
-    .addFunction("print", &draguaPrint)
-    .addFunction("loadJsonConfig", &loadJsonConfig)
+        .addFunction("print", &draguaPrint)
+        .addFunction("loadJsonConfig", &loadJsonConfig)
+
         .beginNamespace("Routes")
             .addFunction("get", &LuaRoutes::get)
             .addFunction("post", &LuaRoutes::post)
@@ -44,10 +45,28 @@ int main() {
             .addFunction("delete", &LuaRoutes::del)
             .addFunction("patch", &LuaRoutes::patch)
         .endNamespace()
+
         .beginClass<LuaRequest>("Request")
-            .addFunction("param", &LuaRequest::param)
-            .addFunction("params", &LuaRequest::params)
+            // Request metadata
+            .addFunction("method", &LuaRequest::method)
+            .addFunction("path", &LuaRequest::path)
+            .addFunction("secure", &LuaRequest::secure)
+            .addFunction("ip", &LuaRequest::ip)
+            // Query parameters
+            .addFunction("query", &LuaRequest::query)
+            .addFunction("queryParams", &LuaRequest::queryParams)
+            // Headers
+            .addFunction("header", &LuaRequest::header)
+            .addFunction("headers", &LuaRequest::headers)
+            // Cookies
+            .addFunction("cookie", &LuaRequest::cookie)
+            .addFunction("cookies", &LuaRequest::cookies)
+            // Body
+            .addFunction("body", &LuaRequest::body)
+            // JSON
+            .addFunction("json", &LuaRequest::json)
         .endClass()
+        
     .endNamespace();
 
     // Run a Lua script
