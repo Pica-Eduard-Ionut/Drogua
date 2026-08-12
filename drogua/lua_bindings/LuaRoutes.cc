@@ -61,6 +61,13 @@ Json::Value LuaRoutes::luaTableToJson(const luabridge::LuaRef &table) {
                 result[key] = Json::nullValue;
                 break;
 
+            case LUA_TTABLE: {
+                luabridge::LuaRef nested = luabridge::LuaRef::fromStack(L, -1);
+
+                result[key] = luaTableToJson(nested);
+                break;
+            }
+
             default:
                 std::cerr << "Unsupported Lua value for key '" << key << "'\n";
                 break;
