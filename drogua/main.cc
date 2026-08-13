@@ -7,6 +7,7 @@
 // include libs for wrapper functions
 #include <lua_bindings/LuaRoutes.h>
 #include <lua_bindings/LuaRequest.h>
+#include <lua_bindings/LuaHttpAppFramework.h>
 
 // temp
 #include <iostream>
@@ -16,11 +17,6 @@ using namespace drogon;
 
 // C++ function we want to expose to Lua
 void draguaPrint(const std::string& message) { std::cout << "[Drogua] " << message << std::endl; }
-
-// Config loading methods
-void loadJsonConfig(const std::string& file) {
-    app().loadConfigFile("./" + file + ".json");
-}
 
 int main() {
     // Lua setup
@@ -36,7 +32,17 @@ int main() {
     luabridge::getGlobalNamespace(L)
     .beginNamespace("Drogua")
         .addFunction("print", &draguaPrint)
-        .addFunction("loadJsonConfig", &loadJsonConfig)
+
+        .addFunction("app", &LuaHttpAppFramework::instance)
+            .beginClass<LuaHttpAppFramework>("HttpAppFramework")
+                .addFunction("loadJsonConfig", &LuaHttpAppFramework::loadJsonConfig)
+                .addFunction("setThreadNum", &LuaHttpAppFramework::setThreadNum)
+                .addFunction("addListener", &LuaHttpAppFramework::addListener)
+                .addFunction("setLogPath", &LuaHttpAppFramework::setLogPath)
+                .addFunction("setLogLevel", &LuaHttpAppFramework::setLogLevel)
+                .addFunction("enableRunAsDaemon", &LuaHttpAppFramework::enableRunAsDaemon)
+                .addFunction("run", &LuaHttpAppFramework::run)
+            .endClass()
 
         .beginNamespace("Routes")
             .addFunction("get", &LuaRoutes::get)
@@ -76,14 +82,14 @@ int main() {
     }
 
     //Set HTTP listener address and port
-    app().addListener("0.0.0.0", 5555);
+    //app().addListener("0.0.0.0", 5555);
 
     //Load config file
     //drogon::app().loadConfigFile("../config.json");
     //drogon::app().loadConfigFile("../config.yaml");
 
     //Run HTTP framework,the method will block in the internal event loop
-    app().run();
+    //app().run();
 
     return 0;
 }
