@@ -36,19 +36,6 @@ endif ()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# include all binding files
-file(GLOB LUA_BINDINGS
-    "${CMAKE_CURRENT_SOURCE_DIR}/lua_bindings/*.cc"
-)
-
-add_executable(${PROJECT_NAME} main.cc ${LUA_BINDINGS})
-
-# added by me to make it take the local libs in the /lib
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    BUILD_RPATH "$ORIGIN/lib;$ORIGIN/../lib"
-    INSTALL_RPATH "$ORIGIN/lib"
-)
-
 # ##############################################################################
 # If you include the drogon source code locally in your project, use this method
 # to add drogon 
@@ -58,18 +45,45 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 # and comment out the following lines
 find_package(Drogon CONFIG REQUIRED)
 # ======
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    Drogon::Drogon
-    PkgConfig::LUA
+
+# ##############################################################################
+# Lua bindings library
+
+# Include all binding files
+file(GLOB LUA_BINDINGS
+    "${CMAKE_CURRENT_SOURCE_DIR}/lua_bindings/*.cc"
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+# Make a library for the includes so that the tests can include it
+add_library(drogua_lua STATIC
+    ${LUA_BINDINGS}
+)
+
+target_include_directories(drogua_lua PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/models
     ${luabridge3_SOURCE_DIR}/Source
 )
-# ======
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+
+target_link_libraries(drogua_lua PUBLIC
+    Drogon::Drogon
+    PkgConfig::LUA
+)
+
+# ##############################################################################
+# Main application
+
+add_executable(${PROJECT_NAME} main.cc)
+
+# added by me to make it take the local libs in the /lib
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    BUILD_RPATH "$ORIGIN/lib;$ORIGIN/../lib"
+    INSTALL_RPATH "$ORIGIN/lib"
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    drogua_lua
+)
 
 # ##############################################################################
 
@@ -104,12 +118,13 @@ target_sources(${PROJECT_NAME}
                ${SRC_DIR}
                ${CTL_SRC}
                ${FILTER_SRC}
-               ${PLUGIN_SRC}
                ${MODEL_SRC})
 # ##############################################################################
 # uncomment the following line for dynamically loading views 
 # set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS ON)
 
 # ##############################################################################
+# Testing
+enable_testing()
 
 add_subdirectory(test)

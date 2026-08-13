@@ -12,10 +12,10 @@ echo "Project: ${PROJECT_DIR}"
 echo "Image:   ${IMAGE}"
 
 podman run --rm -it \
--v="${PROJECT_DIR}:${CONTAINER_PROJECT}:Z,U" \
--w="${CONTAINER_PROJECT}" \
-"${IMAGE}" \
-sh -lc '
+    -v="${PROJECT_DIR}:${CONTAINER_PROJECT}:Z,U" \
+    -w="${CONTAINER_PROJECT}" \
+    "${IMAGE}" \
+    sh -lc '
 set -e
 
     echo "==> Creating library directory"
@@ -24,6 +24,9 @@ set -e
     echo "==> Building application"
     cmake -S . -B build
     cmake --build build -j$(nproc)
+
+    echo "==> Running tests"
+    ctest --test-dir build --output-on-failure
 
     echo "==> Copying runtime libraries"
 
