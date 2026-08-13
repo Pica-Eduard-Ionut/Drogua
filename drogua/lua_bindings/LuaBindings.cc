@@ -9,13 +9,11 @@
 #include <iostream>
 #include <string>
 
-void draguaPrint(const std::string& message)
-{
+void draguaPrint(const std::string& message) {
     std::cout << "[Drogua] " << message << std::endl;
 }
 
-void registerDrogua(lua_State* L)
-{
+void registerDrogua(lua_State* L) {
     luabridge::getGlobalNamespace(L)
         .beginNamespace("Drogua")
 
@@ -23,20 +21,13 @@ void registerDrogua(lua_State* L)
 
             .addFunction("app", &LuaHttpAppFramework::instance)
                 .beginClass<LuaHttpAppFramework>("HttpAppFramework")
-                    .addFunction("loadJsonConfig",
-                                 &LuaHttpAppFramework::loadJsonConfig)
-                    .addFunction("setThreadNum",
-                                 &LuaHttpAppFramework::setThreadNum)
-                    .addFunction("addListener",
-                                 &LuaHttpAppFramework::addListener)
-                    .addFunction("setLogPath",
-                                 &LuaHttpAppFramework::setLogPath)
-                    .addFunction("setLogLevel",
-                                 &LuaHttpAppFramework::setLogLevel)
-                    .addFunction("enableRunAsDaemon",
-                                 &LuaHttpAppFramework::enableRunAsDaemon)
-                    .addFunction("run",
-                                 &LuaHttpAppFramework::run)
+                    .addFunction("loadJsonConfig", &LuaHttpAppFramework::loadJsonConfig)
+                    .addFunction("setThreadNum", &LuaHttpAppFramework::setThreadNum)
+                    .addFunction("addListener", &LuaHttpAppFramework::addListener)
+                    .addFunction("setLogPath", &LuaHttpAppFramework::setLogPath)
+                    .addFunction("setLogLevel", &LuaHttpAppFramework::setLogLevel)
+                    .addFunction("enableRunAsDaemon", &LuaHttpAppFramework::enableRunAsDaemon)
+                    .addFunction("run", &LuaHttpAppFramework::run)
                 .endClass()
 
             .beginNamespace("Routes")
