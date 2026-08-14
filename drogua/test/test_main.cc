@@ -5,6 +5,9 @@
 int main(int argc, char** argv)  {
     using namespace drogon;
 
+    // HTTP listener used by integration tests.
+    app().addListener("127.0.0.1", 18080);
+    
     std::promise<void> p1;
     std::future<void> f1 = p1.get_future();
 

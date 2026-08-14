@@ -42,7 +42,7 @@ DROGON_TEST(LuaBindings) {
         Drogua.print("Hello from Lua")
     )"));
 
-    lua_close(L);
+    //lua_close(L);
 }
 
 DROGON_TEST(LuaBindingsPrint) {

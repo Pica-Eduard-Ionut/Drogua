@@ -1,14 +1,18 @@
 #include <drogon/drogon_test.h>
-// lua includes
+#include <drogon/drogon.h>
+
 #include <lua.hpp>
 #include <lua_bindings/LuaBindings.h>
+
 #include <string>
+
+using namespace drogon;
 
 namespace {
     bool runLuaFile(lua_State* L, const std::string& path) {
         if (luaL_dofile(L, path.c_str()) != LUA_OK) {
             const char* error = lua_tostring(L, -1);
-            if (error) { LOG_ERROR << "Lua test failed: " << error; }
+            if (error) { LOG_ERROR << "Lua test failed in " << path << ": " << error; }
             lua_pop(L, 1);
             return false;
         }
@@ -19,11 +23,22 @@ namespace {
 DROGON_TEST(LuaBindingsApp) {
     lua_State* L = luaL_newstate();
     REQUIRE(L != nullptr);
+
     luaL_openlibs(L);
     registerDrogua(L);
-
-    // run lua files
     CHECK(runLuaFile(L, "lua/test_app.lua"));
 
-    lua_close(L);
+    //lua_close(L);
+}
+
+DROGON_TEST(LuaRoutesIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+    CHECK(runLuaFile(L, "lua/test_routes.lua"));
+    CHECK(runLuaFile(L, "lua/test_routes_http.lua"));
+
+    //lua_close(L);
 }

@@ -40,4 +40,10 @@ Drogua.Routes.get("/user", function()
     }
 end)
 
+Drogua.Routes.get("/user/{id}", function(req, id) 
+    return {
+        id = id
+    }
+end)
+
 Drogua.app():run()
