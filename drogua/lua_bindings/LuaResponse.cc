@@ -1,7 +1,8 @@
 #include "LuaResponse.h"
 
 LuaResponse::LuaResponse()
-    : response_(drogon::HttpResponse::newHttpResponse()) {}
+    : response_(drogon::HttpResponse::newHttpResponse()),
+      contentType_() {}
 
 // Status
 int LuaResponse::status() const {
@@ -42,15 +43,22 @@ luabridge::LuaRef LuaResponse::headers(lua_State* L) const {
 }
 
 // Content-Type
-LuaResponse& LuaResponse::contentType(const std::string& type) {
+std::string LuaResponse::contentType() const {
+    return contentType_;
+}
+
+LuaResponse& LuaResponse::setContentType(const std::string& type) {
     response_->setContentTypeString(type);
+    contentType_ = type;
+
     return *this;
 }
 
 // JSON
 LuaResponse& LuaResponse::json(lua_State* L, const luabridge::LuaRef& value) {
-    response_->setContentTypeString("application/json");
+    setContentType("application/json");
     response_->setBody(luaToJson(L, value).toStyledString());
+
     return *this;
 }
 

@@ -64,6 +64,7 @@ void registerDrogua(lua_State* L) {
                 .addFunction("setHeader", &LuaResponse::setHeader)
                 .addFunction("headers", &LuaResponse::headers)
                 .addFunction("contentType", &LuaResponse::contentType)
+                .addFunction("setContentType", &LuaResponse::setContentType)
                 .addFunction("json", &LuaResponse::json)
             .endClass()
 
