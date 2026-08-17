@@ -4,6 +4,7 @@
 
 #include <lua_bindings/LuaRoutes.h>
 #include <lua_bindings/LuaRequest.h>
+#include <lua_bindings/LuaResponse.h>
 #include <lua_bindings/LuaHttpAppFramework.h>
 
 #include <iostream>
@@ -51,6 +52,19 @@ void registerDrogua(lua_State* L) {
                 .addFunction("cookies", &LuaRequest::cookies)
                 .addFunction("body", &LuaRequest::body)
                 .addFunction("json", &LuaRequest::json)
+            .endClass()
+
+            .beginClass<LuaResponse>("Response")
+                .addConstructor<void(*)()>()
+                .addFunction("status", &LuaResponse::status)
+                .addFunction("setStatus", &LuaResponse::setStatus)
+                .addFunction("body", &LuaResponse::body)
+                .addFunction("setBody", &LuaResponse::setBody)
+                .addFunction("header", &LuaResponse::header)
+                .addFunction("setHeader", &LuaResponse::setHeader)
+                .addFunction("headers", &LuaResponse::headers)
+                .addFunction("contentType", &LuaResponse::contentType)
+                .addFunction("json", &LuaResponse::json)
             .endClass()
 
         .endNamespace();
