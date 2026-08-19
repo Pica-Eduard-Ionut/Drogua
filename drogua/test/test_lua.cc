@@ -27,8 +27,6 @@ DROGON_TEST(LuaBindingsApp) {
     luaL_openlibs(L);
     registerDrogua(L);
     CHECK(runLuaFile(L, "lua/test_app.lua"));
-
-    //lua_close(L);
 }
 
 DROGON_TEST(LuaRoutesIntegration) {
@@ -39,8 +37,6 @@ DROGON_TEST(LuaRoutesIntegration) {
     registerDrogua(L);
     CHECK(runLuaFile(L, "lua/test_routes.lua"));
     CHECK(runLuaFile(L, "lua/test_routes_http.lua"));
-
-    //lua_close(L);
 }
 
 DROGON_TEST(LuaRequestIntegration) {
@@ -52,6 +48,15 @@ DROGON_TEST(LuaRequestIntegration) {
 
     CHECK(runLuaFile(L, "lua/test_requests.lua"));
     CHECK(runLuaFile(L, "lua/test_requests_http.lua"));
+}
 
-    // lua_close(L);
+DROGON_TEST(LuaResponseIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_response.lua"));
+    CHECK(runLuaFile(L, "lua/test_response_http.lua"));
 }
