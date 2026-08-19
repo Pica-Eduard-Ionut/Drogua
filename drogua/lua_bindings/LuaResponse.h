@@ -27,13 +27,13 @@ class LuaResponse {
         LuaResponse& setContentType(const std::string& type);
 
         // JSON
-        LuaResponse& json(lua_State* L, const luabridge::LuaRef& value);
+        LuaResponse& json(const luabridge::LuaRef& value);
 
         // Underlying Drogon response
         drogon::HttpResponsePtr response() const;
 
     private:
-        static Json::Value luaToJson(lua_State* L, const luabridge::LuaRef& value);
+        static Json::Value luaToJson(const luabridge::LuaRef& value);
         static Json::Value luaValueToJson(lua_State* L, int index);
         drogon::HttpResponsePtr response_;
         std::string contentType_;

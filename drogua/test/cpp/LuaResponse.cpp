@@ -105,7 +105,7 @@ DROGON_TEST(LuaResponseJson) {
     json["name"] = "Drogua";
     json["age"] = 42;
     json["active"] = true;
-    response.json(L, json);
+    response.json(json);
 
     CHECK(response.contentType() == "application/json");
 
@@ -126,6 +126,7 @@ DROGON_TEST(LuaResponseJson) {
     CHECK(parsed["active"].asBool() == true);
 }
 
+
 // Verifies that nested Lua tables are converted into nested JSON objects.
 DROGON_TEST(LuaResponseJsonNested) {
     auto* L = createLuaState();
@@ -139,12 +140,13 @@ DROGON_TEST(LuaResponseJsonNested) {
     user["name"] = "Marian";
     user["active"] = true;
     json["user"] = user;
+    response.json(json);
 
-    response.json(L, json);
     Json::Value parsed;
     Json::CharReaderBuilder reader;
     std::string errors;
     std::istringstream stream(response.body());
+
     REQUIRE(Json::parseFromStream(
         reader,
         stream,
@@ -153,6 +155,7 @@ DROGON_TEST(LuaResponseJsonNested) {
     ));
 
     CHECK(parsed["message"].asString() == "Hello");
+
     REQUIRE(parsed["user"].isObject());
     CHECK(parsed["user"]["id"].asInt() == 123);
     CHECK(parsed["user"]["name"].asString() == "Marian");
@@ -172,7 +175,7 @@ DROGON_TEST(LuaResponseJsonArray) {
     items[3] = "three";
     json["items"] = items;
 
-    response.json(L, json);
+    response.json(json);
     Json::Value parsed;
     Json::CharReaderBuilder reader;
     std::string errors;
@@ -214,7 +217,7 @@ DROGON_TEST(LuaResponseJsonComplex) {
     users[2] = user2;
 
     json["users"] = users;
-    response.json(L, json);
+    response.json(json);
     Json::Value parsed;
     Json::CharReaderBuilder reader;
     std::string errors;

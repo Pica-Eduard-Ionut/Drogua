@@ -55,20 +55,24 @@ LuaResponse& LuaResponse::setContentType(const std::string& type) {
 }
 
 // JSON
-LuaResponse& LuaResponse::json(lua_State* L, const luabridge::LuaRef& value) {
+LuaResponse& LuaResponse::json(const luabridge::LuaRef& value) {
+    if (!value.isTable())
+        throw std::runtime_error("Response:json() expects a table");
+
     setContentType("application/json");
-    response_->setBody(luaToJson(L, value).toStyledString());
+    response_->setBody(luaToJson(value).toStyledString());
 
     return *this;
 }
 
-// Lua -> JSON
-Json::Value LuaResponse::luaToJson(lua_State* L, const luabridge::LuaRef& value) {
+Json::Value LuaResponse::luaToJson(const luabridge::LuaRef& value) {
+    lua_State* L = value.state();
     value.push(L);
     auto result = luaValueToJson(L, -1);
     lua_pop(L, 1);
     return result;
 }
+
 
 Json::Value LuaResponse::luaValueToJson(lua_State* L, int index) {
     if (index < 0)

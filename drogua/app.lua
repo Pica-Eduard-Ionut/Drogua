@@ -8,42 +8,55 @@ Drogua.app()
 Drogua.print("Hello from Lua!")
 Drogua.print("This message is coming from app.lua")
 
--- testing routes
-Drogua.Routes.get("/test/get", {
-    method = "GET",
-    message = "GET works"
-})
-
-Drogua.Routes.post("/test/post", {
-    method = "POST",
-    message = "POST works"
-})
-
-Drogua.Routes.put("/test/put", {
-    method = "PUT",
-    message = "PUT works"
-})
-
-Drogua.Routes.delete("/test/delete", {
-    method = "DELETE",
-    message = "DELETE works"
-})
-
-Drogua.Routes.patch("/test/patch", {
-    method = "PATCH",
-    message = "PATCH works"
-})
-
-Drogua.Routes.get("/user", function() 
+Drogua.Routes.get("/test/table", function(req)
     return {
-        message = "test"
+        message = "hello from lua",
+        status = "ok",
+        number = 42,
+        nested = {
+            foo = "bar"
+        }
     }
 end)
 
-Drogua.Routes.get("/user/{id}", function(req, id) 
-    return {
-        id = id
-    }
+Drogua.Routes.get("/test/response", function(req)
+    local response = Drogua.Response()
+
+    response:setStatus(201)
+    response:setBody("Hello from LuaResponse!")
+    response:setHeader("X-Test", "LuaResponse")
+    response:setContentType("text/plain")
+
+    return response
+end)
+
+Drogua.Routes.get("/test/json-response", function(req)
+    local response = Drogua.Response()
+
+    response:setStatus(202)
+    response:setHeader("X-Test", "JSON")
+    response:json({
+        message = "hello",
+        success = true,
+        number = 123,
+        nested = {
+            value = "works"
+        }
+    })
+
+    return response
+end)
+
+Drogua.Routes.get("/test/headers", function(req)
+    local response = Drogua.Response()
+
+    response:setStatus(200)
+    response:setHeader("X-Custom-Header", "hello")
+    response:setHeader("X-Another-Header", "world")
+    response:setContentType("text/plain")
+    response:setBody("Check the response headers!")
+
+    return response
 end)
 
 Drogua.app():run()

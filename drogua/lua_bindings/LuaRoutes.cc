@@ -1,5 +1,6 @@
 #include "LuaRoutes.h"
 #include "LuaRequest.h"
+#include "LuaResponse.h"
 
 #include <stdexcept>
 #include <string>
@@ -112,7 +113,7 @@ void LuaRoutes::registerRoute(const std::string& path, drogon::HttpMethod method
     }
 }
 
-Json::Value LuaRoutes::executeHandler(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params) {
+drogon::HttpResponsePtr LuaRoutes::executeHandler(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params) {
     if (handler.isTable())
         return executeLuaTable(handler);
 
@@ -122,11 +123,12 @@ Json::Value LuaRoutes::executeHandler(const luabridge::LuaRef& handler, const dr
     throw std::runtime_error("Invalid Lua route handler");
 }
 
-Json::Value LuaRoutes::executeLuaTable(const luabridge::LuaRef &handler) {
-    return luaTableToJson(handler);
+drogon::HttpResponsePtr LuaRoutes::executeLuaTable(const luabridge::LuaRef &handler) {
+    Json::Value json = luaTableToJson(handler);
+    return drogon::HttpResponse::newHttpJsonResponse(json);
 }
 
-Json::Value LuaRoutes::executeLuaFunction(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params) {
+drogon::HttpResponsePtr LuaRoutes::executeLuaFunction(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params) {
     lua_State* L = handler.state();
     const int base = lua_gettop(L);
     LuaRequest luaRequest(req);
@@ -159,12 +161,29 @@ Json::Value LuaRoutes::executeLuaFunction(const luabridge::LuaRef& handler, cons
     }
 
     auto luaResult = result.value();
+
+    // LuaResponse
+    if (luaResult.isUserdata()) {
+        //auto response = luabridge::get<LuaResponse>(L, -1);
+        auto response = luabridge::get<LuaResponse*>(L, -1);
+
+        if (response) {
+            auto httpResponse = response.value()->response();
+            lua_settop(L, base);
+            return httpResponse;
+        }
+    }
+
+    // Lua table
+    if (luaResult.isTable()) {
+        Json::Value json = luaTableToJson(luaResult);
+        lua_settop(L, base);
+
+        return drogon::HttpResponse::newHttpJsonResponse(json);
+    }
+
     lua_settop(L, base);
-
-    if (!luaResult.isTable())
-        throw std::runtime_error("Lua route handler must return a table");
-
-    return luaTableToJson(luaResult);
+    throw std::runtime_error("Lua route handler must return a table or Drogua.Response");
 }
 
 void LuaRoutes::sendJsonResponse(const Json::Value &json, std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
@@ -218,8 +237,8 @@ void LuaRoutes::registerRoute0(const std::string &path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
         
         try {
-            Json::Value json = LuaRoutes::executeHandler(handler, req, {});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {});
+            callback(std::move(response));
         }
         catch (const std::exception &e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -237,8 +256,8 @@ void LuaRoutes::registerRoute1(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -256,8 +275,8 @@ void LuaRoutes::registerRoute2(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1, p2});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1, p2});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -275,8 +294,8 @@ void LuaRoutes::registerRoute3(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1, p2, p3});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1, p2, p3});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -294,8 +313,8 @@ void LuaRoutes::registerRoute4(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -313,8 +332,8 @@ void LuaRoutes::registerRoute5(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4, p5});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4, p5});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
@@ -332,8 +351,8 @@ void LuaRoutes::registerRoute6(const std::string& path, drogon::HttpMethod metho
             std::cerr << "PARAM: " << key << " = " << value << '\n';
 
         try {
-            const Json::Value json = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4, p5, p6});
-            LuaRoutes::sendJsonResponse(json, std::move(callback));
+            auto response = LuaRoutes::executeHandler(handler, req, {p1, p2, p3, p4, p5, p6});
+            callback(std::move(response));
         }
         catch (const std::exception& e) {
             LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
