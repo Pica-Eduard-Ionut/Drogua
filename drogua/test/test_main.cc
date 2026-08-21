@@ -7,6 +7,7 @@ int main(int argc, char** argv)  {
 
     // HTTP listener used by integration tests.
     app().addListener("127.0.0.1", 18080);
+    app().loadConfigFile("config.json");
     
     std::promise<void> p1;
     std::future<void> f1 = p1.get_future();
