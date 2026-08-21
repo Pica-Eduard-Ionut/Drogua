@@ -27,58 +27,100 @@ void LuaRoutes::patch(const std::string &path, const luabridge::LuaRef &handler)
     registerRoute(path, Patch, handler);
 }
 
-Json::Value LuaRoutes::luaTableToJson(const luabridge::LuaRef &table) {
-    Json::Value result;
-    if (!table.isTable())
-        return result;
+Json::Value LuaRoutes::luaValueToJson(lua_State* L, int index) {
+    switch (lua_type(L, index)) {
+        case LUA_TSTRING:
+            return Json::Value(lua_tostring(L, index));
 
-    lua_State *L = table.state();
+        case LUA_TNUMBER:
+            if (lua_isinteger(L, index))
+                return Json::Value(static_cast<Json::Int64>(lua_tointeger(L, index)));
+
+            return Json::Value(lua_tonumber(L, index));
+
+        case LUA_TBOOLEAN:
+            return Json::Value(lua_toboolean(L, index) != 0);
+
+        case LUA_TNIL:
+            return Json::nullValue;
+
+        case LUA_TTABLE: {
+            luabridge::LuaRef nested = luabridge::LuaRef::fromStack(L, index);
+
+            return luaTableToJson(nested);
+        }
+
+        default:
+            std::cerr << "Unsupported Lua value\n";
+            return Json::nullValue;
+    }
+}
+
+Json::Value LuaRoutes::luaTableToJson(const luabridge::LuaRef& table) {
+    if (!table.isTable()) return Json::nullValue;
+
+    lua_State* L = table.state();
+
     table.push(L);
     const int tableIndex = lua_gettop(L);
-    // Push first key
+
+    // Determine whether this is an array.
+    bool isArray = true;
+    lua_Integer maxIndex = 0;
+    lua_Integer count = 0;
+
     lua_pushnil(L);
+
     while (lua_next(L, tableIndex) != 0) {
-        if (lua_type(L, -2) == LUA_TSTRING) {
-            const char *key = lua_tostring(L, -2);
-            switch (lua_type(L, -1)) {
-            case LUA_TSTRING:
-                result[key] = lua_tostring(L, -1);
-                break;
+        if (lua_type(L, -2) == LUA_TNUMBER && lua_isinteger(L, -2)) {
+            const lua_Integer index = lua_tointeger(L, -2);
+            if (index > 0) {
+                ++count;
+                if (index > maxIndex)
+                    maxIndex = index;
 
-            case LUA_TNUMBER:
-                // Lua integer
-                if (lua_isinteger(L, -1))
-                    result[key] = static_cast<Json::Int64>(lua_tointeger(L, -1));
-                // Lua floating-point number
-                else
-                    result[key] = lua_tonumber(L, -1);
-                break;
-
-            case LUA_TBOOLEAN:
-                result[key] = lua_toboolean(L, -1) != 0;
-                break;
-
-            case LUA_TNIL:
-                result[key] = Json::nullValue;
-                break;
-
-            case LUA_TTABLE: {
-                luabridge::LuaRef nested = luabridge::LuaRef::fromStack(L, -1);
-
-                result[key] = luaTableToJson(nested);
-                break;
+            } else {
+                isArray = false;
             }
-
-            default:
-                std::cerr << "Unsupported Lua value for key '" << key << "'\n";
-                break;
-            }
+        } else {
+            isArray = false;
         }
-        // Remove value, keep key for lua_next()
+
         lua_pop(L, 1);
     }
-    // Remove the table
+
+    // A Lua table is an array only if its integer keys are exactly 1..N with no holes.
+    if (isArray && maxIndex != count)
+        isArray = false;
+
+    Json::Value result = isArray ? Json::Value(Json::arrayValue) : Json::Value(Json::objectValue);
+
+    // Iterate through the table again and convert its values.
+    lua_pushnil(L);
+
+    while (lua_next(L, tableIndex) != 0) {
+        const int keyType = lua_type(L, -2);
+
+        // number indexed array
+        if (isArray && keyType == LUA_TNUMBER && lua_isinteger(L, -2)) {
+            const lua_Integer index = lua_tointeger(L, -2);
+            if (index > 0) {
+                result[static_cast<Json::ArrayIndex>(index - 1)] = luaValueToJson(L, -1);
+            }
+        }
+
+        // string indexed array
+        else if (!isArray && keyType == LUA_TSTRING) {
+            const char* key = lua_tostring(L, -2);
+            result[key] = luaValueToJson(L, -1);
+        }
+
+        lua_pop(L, 1);
+    }
+
+    // Remove the table.
     lua_pop(L, 1);
+
     return result;
 }
 

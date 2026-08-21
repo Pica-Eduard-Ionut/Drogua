@@ -6,6 +6,9 @@
 #include <lua_bindings/LuaRequest.h>
 #include <lua_bindings/LuaResponse.h>
 #include <lua_bindings/LuaHttpAppFramework.h>
+#include <lua_bindings/LuaDatabase.h>
+#include <lua_bindings/LuaResult.h>
+#include <lua_bindings/LuaRow.h>
 
 #include <iostream>
 #include <string>
@@ -68,5 +71,39 @@ void registerDrogua(lua_State* L) {
                 .addFunction("json", &LuaResponse::json)
             .endClass()
 
+            // Database functions
+            .beginNamespace("Database")
+                .addFunction("get", &LuaDatabase::get)
+            .endNamespace()
+
+            .beginClass<LuaDatabase>("DatabaseClient")
+                .addFunction("name", &LuaDatabase::name)
+                .addFunction("valid", &LuaDatabase::valid)
+                .addFunction("exec", &LuaDatabase::execute)
+                .addFunction("query", &LuaDatabase::query)
+                .addFunction("executeAffected", &LuaDatabase::executeAffected)
+                .addFunction("lastInsertId", &LuaDatabase::lastInsertId)
+            .endClass()
+
+            .beginClass<LuaResult>("DatabaseResult")
+                .addFunction("size", &LuaResult::size)
+                .addFunction("count", &LuaResult::count)
+                .addFunction("columns", &LuaResult::columns)
+                .addFunction("columnName", &LuaResult::columnName)
+                .addFunction("row", &LuaResult::row)
+                .addFunction("affectedRows", &LuaResult::affectedRows)
+                .addFunction("insertId", &LuaResult::insertId)
+                .addFunction("toTable", &LuaResult::luaToTable)
+                .addFunction("toString", &LuaResult::toString)
+            .endClass()
+
+            .beginClass<LuaRow>("DatabaseRow")
+                .addFunction("size", &LuaRow::size)
+                .addFunction("columnName", &LuaRow::columnName)
+                .addFunction("isNull", static_cast<bool (LuaRow::*)(const std::string&) const>(&LuaRow::isNull))
+                .addFunction("get", static_cast<std::string (LuaRow::*)(const std::string&) const>(&LuaRow::getString))
+                .addFunction("toString", &LuaRow::toString)
+            .endClass()
+            
         .endNamespace();
 }

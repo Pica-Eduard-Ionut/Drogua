@@ -3,60 +3,170 @@ Drogua.app()
     :setLogLevel("WARN")
     :addListener("0.0.0.0", 5555)
     :setThreadNum(2)
+    :loadJsonConfig("config")
     --:enableRunAsDaemon()
 
 Drogua.print("Hello from Lua!")
 Drogua.print("This message is coming from app.lua")
 
-Drogua.Routes.get("/test/table", function(req)
+-- DB test
+Drogua.Routes.get("/test/db", function(req)
+
+    -- Get it when the application is actually running.
+    local db = Drogua.Database.get("default")
+
+    Drogua.print("Database: " .. db:name())
+    Drogua.print("Valid: " .. tostring(db:valid()))
+
+    local users = db:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    for i = 0, users:count() - 1 do
+        local row = users:row(i)
+
+        Drogua.print(
+            "id = " .. row:get("id")
+        )
+
+        Drogua.print(
+            "name = " .. row:get("name")
+        )
+    end
+
     return {
-        message = "hello from lua",
-        status = "ok",
-        number = 42,
-        nested = {
-            foo = "bar"
-        }
+        rows = users:count()
     }
 end)
 
-Drogua.Routes.get("/test/response", function(req)
-    local response = Drogua.Response()
+Drogua.Routes.get("/test/dbinser", function(req)
 
-    response:setStatus(201)
-    response:setBody("Hello from LuaResponse!")
-    response:setHeader("X-Test", "LuaResponse")
-    response:setContentType("text/plain")
+    local db = Drogua.Database.get("default")
 
-    return response
+    db:exec([[
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        )
+    ]])
+
+    db:exec([[
+        INSERT INTO users (name)
+        VALUES ('Alice')
+    ]])
+
+    db:exec([[
+        INSERT INTO users (name)
+        VALUES ('Bob')
+    ]])
+
+    local users = db:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    for i = 0, users:count() - 1 do
+        local row = users:row(i)
+
+        Drogua.print(row:toString())
+
+        Drogua.print(
+            "id=" .. row:get("id") ..
+            " name=" .. row:get("name")
+        )
+    end
+
+    return {
+        message = "Database test completed",
+        rows = users:count()
+    }
 end)
 
-Drogua.Routes.get("/test/json-response", function(req)
-    local response = Drogua.Response()
+Drogua.Routes.get("/test/db/data", function(req)
 
-    response:setStatus(202)
-    response:setHeader("X-Test", "JSON")
-    response:json({
-        message = "hello",
-        success = true,
-        number = 123,
-        nested = {
-            value = "works"
-        }
-    })
+    local db = Drogua.Database.get("default")
 
-    return response
+    local users = db:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    local data = {}
+
+    for i = 0, users:count() - 1 do
+        local row = users:row(i)
+
+        table.insert(data, {
+            id = row:get("id"),
+            name = row:get("name")
+        })
+    end
+
+    Drogua.print("Lua data type: " .. type(data))
+    Drogua.print("Lua data length: " .. #data)
+    Drogua.print("First user: " .. data[1].name)
+
+    return data
 end)
 
-Drogua.Routes.get("/test/headers", function(req)
-    local response = Drogua.Response()
+Drogua.Routes.get("/test/db/data/{id}", function(req, id)
 
-    response:setStatus(200)
-    response:setHeader("X-Custom-Header", "hello")
-    response:setHeader("X-Another-Header", "world")
-    response:setContentType("text/plain")
-    response:setBody("Check the response headers!")
+    local db = Drogua.Database.get("default")
 
-    return response
+    local users = db:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    local data = {}
+
+    --[[    This is one way to access the data ]]
+    -- for i = 0, users:count() - 1 do
+    --     local row = users:row(i)
+
+    --     if row:get("id") == id then
+    --         table.insert(data, {
+    --             id = row:get("id"),
+    --             name = row:get("name")
+    --         })
+    --     end
+    -- end
+
+    -- [[   This is an other way to access the data ]]
+    -- for i = 0, users:count() - 1 do
+    --     local row = users:row(i)
+
+    --     if tonumber(row:get("id")) == tonumber(id) then
+    --         table.insert(data, {
+    --             id = row:get("id"),
+    --             name = row:get("name")
+    --         })
+    --     end
+    -- end
+
+    -- [[ This is yet another way to access the data ]]
+    -- for i = 0, users:count() - 1 do
+    --     local row = users:row(i)
+
+    --     if i == tonumber(id) - 1 then
+    --         table.insert(data, {
+    --             id = row:get("id"),
+    --             name = row:get("name")
+    --         })
+    --     end
+    -- end
+
+    -- this tests the toTable function
+    data = users:toTable()
+
+
+    return data
 end)
 
 Drogua.app():run()
+

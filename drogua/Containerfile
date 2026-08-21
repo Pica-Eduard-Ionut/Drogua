@@ -5,6 +5,7 @@ WORKDIR /app
 COPY build/drogua /app/drogua
 COPY lib/ /app/lib/
 COPY app.lua /app/app.lua
+COPY config.json /app/config.json
 
 RUN chmod +x /app/drogua
 

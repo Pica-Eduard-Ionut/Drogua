@@ -10,6 +10,7 @@ class LuaRoutes {
         static void del(const std::string& path, const luabridge::LuaRef& handler);
         static void patch(const std::string& path, const luabridge::LuaRef& handler);
         static Json::Value luaTableToJson(const luabridge::LuaRef& table);
+        static Json::Value luaValueToJson(lua_State* L, int index);
 
     private:
         // route registration router to the other methods
