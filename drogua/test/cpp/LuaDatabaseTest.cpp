@@ -46,8 +46,7 @@ namespace {
 // LuaDatabase
 // ---------------------------------------------------------
 
-DROGON_TEST(LuaDatabaseBasic)
-{
+DROGON_TEST(LuaDatabaseBasic) {
     auto db = database();
 
     REQUIRE(db != nullptr);
@@ -56,8 +55,7 @@ DROGON_TEST(LuaDatabaseBasic)
     CHECK(db->valid());
 }
 
-DROGON_TEST(LuaDatabaseExecute)
-{
+DROGON_TEST(LuaDatabaseExecute) {
     auto db = database();
 
     REQUIRE(db != nullptr);
@@ -78,8 +76,7 @@ DROGON_TEST(LuaDatabaseExecute)
     CHECK(result->insertId() > 0);
 }
 
-DROGON_TEST(LuaDatabaseInsert)
-{
+DROGON_TEST(LuaDatabaseInsert) {
     auto db = database();
 
     REQUIRE(db != nullptr);
@@ -106,8 +103,7 @@ DROGON_TEST(LuaDatabaseInsert)
 // LuaResult
 // ---------------------------------------------------------
 
-DROGON_TEST(LuaResultQuery)
-{
+DROGON_TEST(LuaResultQuery) {
     setupUsersTable();
 
     auto db = database();
@@ -126,8 +122,7 @@ DROGON_TEST(LuaResultQuery)
     CHECK(result->columnName(1) == "name");
 }
 
-DROGON_TEST(LuaRowAccess)
-{
+DROGON_TEST(LuaRowAccess) {
     setupUsersTable();
 
     auto db = database();
@@ -150,8 +145,7 @@ DROGON_TEST(LuaRowAccess)
     CHECK(row->toString() == "{id=1, name=Alice}");
 }
 
-DROGON_TEST(LuaRowIndexAccess)
-{
+DROGON_TEST(LuaRowIndexAccess) {
     setupUsersTable();
 
     auto db = database();
@@ -170,8 +164,7 @@ DROGON_TEST(LuaRowIndexAccess)
     CHECK(row->getString(1) == "Alice");
 }
 
-DROGON_TEST(LuaRowNull)
-{
+DROGON_TEST(LuaRowNull) {
     auto db = database();
 
     db->execute(R"(
@@ -203,8 +196,7 @@ DROGON_TEST(LuaRowNull)
 // LuaResult::pushTable
 // ---------------------------------------------------------
 
-DROGON_TEST(LuaResultPushTable)
-{
+DROGON_TEST(LuaResultPushTable) {
     setupUsersTable();
 
     auto db = database();

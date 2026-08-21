@@ -60,3 +60,14 @@ DROGON_TEST(LuaResponseIntegration) {
     CHECK(runLuaFile(L, "lua/test_response.lua"));
     CHECK(runLuaFile(L, "lua/test_response_http.lua"));
 }
+
+DROGON_TEST(LuaDatabaseIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_database.lua"));
+    CHECK(runLuaFile(L, "lua/test_database_http.lua"));
+}
