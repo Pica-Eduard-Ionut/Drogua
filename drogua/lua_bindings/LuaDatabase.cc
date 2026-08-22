@@ -41,6 +41,45 @@ std::shared_ptr<LuaResult> LuaDatabase::query(const std::string& sql) {
     return execute(sql);
 }
 
+// overload for query
+std::shared_ptr<LuaResult> LuaDatabase::query(const std::string& sql, const luabridge::LuaRef& params) {
+    if (!client_) throw std::runtime_error("LuaDatabase '" + name_ + "' has no valid Drogon DbClient");
+    if (!params.isTable()) throw std::runtime_error("Database query parameters must be a Lua table");
+
+    try {
+        auto binder = (*client_) << sql;
+        const auto length = params.length();
+
+        for (int i = 1; i <= length; ++i) {
+            luabridge::LuaRef value(params[i]);
+            if (value.isNil()) binder << nullptr;
+            else if (value.isBool()) binder << value.cast<bool>().value();
+            else if (value.isNumber()) binder << value.cast<double>().value();
+            else if (value.isString()) binder << value.cast<std::string>().value();
+            else throw std::runtime_error("Unsupported database parameter at index " + std::to_string(i));
+        }
+
+        binder << drogon::orm::Mode::Blocking;
+        drogon::orm::Result result(nullptr);
+        binder >> [&result](const drogon::orm::Result& r) { result = r; };
+        binder.exec();
+        return std::make_shared<LuaResult>(std::move(result));
+    } catch (const drogon::orm::DrogonDbException& e) {
+        throw std::runtime_error("Database error [" + name_ + "]: " + std::string(e.base().what()));
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Database error [" + name_ + "]: " + std::string(e.what()));
+    }
+}
+
+// Lua facing wrapper
+std::shared_ptr<LuaResult> LuaDatabase::queryLua(const std::string& sql, const luabridge::LuaRef& params) {
+    if (params.isNil()) {
+        return query(sql);
+    }
+
+    return query(sql, params);
+}
+
 std::size_t LuaDatabase::executeAffected(const std::string& sql) {
     return execute(sql)->affectedRows();
 }

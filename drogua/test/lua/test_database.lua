@@ -127,7 +127,6 @@ end)
 -- ---------------------------------------------------------
 -- GET /lua/database/insert
 -- ---------------------------------------------------------
-
 Routes.get("/lua/database/insert", function(req)
 
     local database = Database.get("lua_test_db")

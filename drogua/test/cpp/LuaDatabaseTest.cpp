@@ -39,6 +39,10 @@ namespace {
         db->execute(
             "INSERT INTO users (name) VALUES ('Alice')"
         );
+
+        db->execute(
+            "INSERT INTO users (name) VALUES ('Bob')"
+        );
     }
 }
 
@@ -115,11 +119,103 @@ DROGON_TEST(LuaResultQuery) {
 
     REQUIRE(result != nullptr);
 
-    CHECK(result->size() == 1);
-    CHECK(result->count() == 1);
+    CHECK(result->size() == 2);
+    CHECK(result->count() == 2);
     CHECK(result->columns() == 2);
     CHECK(result->columnName(0) == "id");
     CHECK(result->columnName(1) == "name");
+}
+
+DROGON_TEST(LuaDatabaseParameterizedQuery) {
+    setupUsersTable();
+
+    auto db = database();
+
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+
+    // -----------------------------------------------------
+    // Query Alice
+    // -----------------------------------------------------
+    luabridge::LuaRef aliceParams = luabridge::newTable(L);
+    aliceParams[1] = "Alice";
+
+    auto aliceResult = db->query(
+        R"(
+            SELECT id, name
+            FROM users
+            WHERE name = ?
+            ORDER BY id
+        )",
+        aliceParams
+    );
+
+    REQUIRE(aliceResult != nullptr);
+    CHECK(aliceResult->count() == 1);
+
+    auto aliceRow = aliceResult->row(0);
+
+    REQUIRE(aliceRow != nullptr);
+
+    CHECK(aliceRow->getString("id") == "1");
+    CHECK(aliceRow->getString("name") == "Alice");
+
+    // -----------------------------------------------------
+    // Query Bob
+    // -----------------------------------------------------
+    luabridge::LuaRef bobParams = luabridge::newTable(L);
+    bobParams[1] = "Bob";
+
+    auto bobResult = db->query(
+        R"(
+            SELECT id, name
+            FROM users
+            WHERE name = ?
+            ORDER BY id
+        )",
+        bobParams
+    );
+
+    REQUIRE(bobResult != nullptr);
+    CHECK(bobResult->count() == 1);
+
+    auto bobRow = bobResult->row(0);
+
+    REQUIRE(bobRow != nullptr);
+
+    CHECK(bobRow->getString("id") == "2");
+    CHECK(bobRow->getString("name") == "Bob");
+}
+
+DROGON_TEST(LuaDatabaseParameterizedQueryNoMatch) {
+    setupUsersTable();
+
+    auto db = database();
+
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+
+    luabridge::LuaRef params = luabridge::newTable(L);
+    params[1] = "Charlie";
+
+    auto result = db->query(
+        R"(
+            SELECT id, name
+            FROM users
+            WHERE name = ?
+            ORDER BY id
+        )",
+        params
+    );
+
+    REQUIRE(result != nullptr);
+
+    CHECK(result->count() == 0);
+    CHECK(result->size() == 0);
 }
 
 DROGON_TEST(LuaRowAccess) {
@@ -129,7 +225,7 @@ DROGON_TEST(LuaRowAccess) {
     auto result = db->query("SELECT id, name FROM users ORDER BY id");
 
     REQUIRE(result != nullptr);
-    REQUIRE(result->count() == 1);
+    REQUIRE(result->count() == 2);
 
     auto row = result->row(0);
 
@@ -152,7 +248,7 @@ DROGON_TEST(LuaRowIndexAccess) {
     auto result = db->query("SELECT id, name FROM users ORDER BY id");
 
     REQUIRE(result != nullptr);
-    REQUIRE(result->count() == 1);
+    REQUIRE(result->count() == 2);
 
     auto row = result->row(0);
 
@@ -207,7 +303,7 @@ DROGON_TEST(LuaResultPushTable) {
     )");
 
     REQUIRE(result != nullptr);
-    REQUIRE(result->count() == 1);
+    REQUIRE(result->count() == 2);
 
     lua_State* L = luaL_newstate();
     REQUIRE(L != nullptr);

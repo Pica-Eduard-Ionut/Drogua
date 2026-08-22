@@ -80,7 +80,7 @@ void registerDrogua(lua_State* L) {
                 .addFunction("name", &LuaDatabase::name)
                 .addFunction("valid", &LuaDatabase::valid)
                 .addFunction("exec", &LuaDatabase::execute)
-                .addFunction("query", &LuaDatabase::query)
+                .addFunction("query", &LuaDatabase::queryLua)
                 .addFunction("executeAffected", &LuaDatabase::executeAffected)
                 .addFunction("lastInsertId", &LuaDatabase::lastInsertId)
             .endClass()
