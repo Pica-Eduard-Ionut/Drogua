@@ -4,6 +4,9 @@
 #include <lua.hpp>
 #include <LuaBridge/LuaBridge.h>
 
+#include "LuaResult.h"
+#include "LuaTransaction.h"
+
 #include <memory>
 #include <string>
 
@@ -27,6 +30,8 @@ class LuaDatabase {
 
         std::size_t executeAffected(const std::string& sql);
         unsigned long long lastInsertId(const std::string& sql);
+        
+        std::shared_ptr<LuaTransaction> begin();
 
     private:
         std::string name_;

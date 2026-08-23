@@ -1,5 +1,4 @@
 #include "LuaDatabase.h"
-#include "LuaResult.h"
 
 #include <drogon/drogon.h>
 
@@ -90,4 +89,43 @@ unsigned long long LuaDatabase::lastInsertId(const std::string& sql) {
 
 std::shared_ptr<LuaDatabase> LuaDatabase::get(const std::string& name) {
     return std::make_shared<LuaDatabase>(name);
+}
+
+std::shared_ptr<LuaTransaction> LuaDatabase::begin() {
+    if (!client_) {
+        throw std::runtime_error(
+            "LuaDatabase '" + name_ +
+            "' has no valid Drogon DbClient");
+    }
+
+    try {
+        auto transaction = client_->newTransaction(
+            [](bool success) {
+                if (success) {
+                    LOG_TRACE << "Lua transaction committed";
+                }
+                else {
+                    LOG_ERROR << "Lua transaction commit failed";
+                }
+            }
+        );
+
+        return std::make_shared<LuaTransaction>(
+            std::move(transaction)
+        );
+    }
+    catch (const drogon::orm::DrogonDbException& e) {
+        throw std::runtime_error(
+            "Failed to begin transaction [" +
+            name_ + "]: " +
+            std::string(e.base().what())
+        );
+    }
+    catch (const std::exception& e) {
+        throw std::runtime_error(
+            "Failed to begin transaction [" +
+            name_ + "]: " +
+            std::string(e.what())
+        );
+    }
 }

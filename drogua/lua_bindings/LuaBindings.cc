@@ -9,6 +9,7 @@
 #include <lua_bindings/LuaDatabase.h>
 #include <lua_bindings/LuaResult.h>
 #include <lua_bindings/LuaRow.h>
+#include <lua_bindings/LuaTransaction.h>
 
 #include <iostream>
 #include <string>
@@ -83,6 +84,7 @@ void registerDrogua(lua_State* L) {
                 .addFunction("query", &LuaDatabase::queryLua)
                 .addFunction("executeAffected", &LuaDatabase::executeAffected)
                 .addFunction("lastInsertId", &LuaDatabase::lastInsertId)
+                .addFunction("begin", &LuaDatabase::begin)
             .endClass()
 
             .beginClass<LuaResult>("DatabaseResult")
@@ -103,6 +105,15 @@ void registerDrogua(lua_State* L) {
                 .addFunction("isNull", static_cast<bool (LuaRow::*)(const std::string&) const>(&LuaRow::isNull))
                 .addFunction("get", static_cast<std::string (LuaRow::*)(const std::string&) const>(&LuaRow::getString))
                 .addFunction("toString", &LuaRow::toString)
+            .endClass()
+
+            .beginClass<LuaTransaction>("DatabaseTransaction")
+                .addFunction("valid", &LuaTransaction::valid)
+                .addFunction("query", &LuaTransaction::queryLua)
+                .addFunction("executeAffected", &LuaTransaction::executeAffected)
+                .addFunction("lastInsertId", &LuaTransaction::lastInsertId)
+                .addFunction("commit", &LuaTransaction::commit)
+                .addFunction("rollback", &LuaTransaction::rollback)
             .endClass()
             
         .endNamespace();

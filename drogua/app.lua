@@ -9,39 +9,12 @@ Drogua.app()
 Drogua.print("Hello from Lua!")
 Drogua.print("This message is coming from app.lua")
 
--- DB test
-Drogua.Routes.get("/test/db", function(req)
 
-    -- Get it when the application is actually running.
-    local db = Drogua.Database.get("default")
+-- ============================================================
+-- Create the table
+-- ============================================================
 
-    Drogua.print("Database: " .. db:name())
-    Drogua.print("Valid: " .. tostring(db:valid()))
-
-    local users = db:query([[
-        SELECT id, name
-        FROM users
-        ORDER BY id
-    ]])
-
-    for i = 0, users:count() - 1 do
-        local row = users:row(i)
-
-        Drogua.print(
-            "id = " .. row:get("id")
-        )
-
-        Drogua.print(
-            "name = " .. row:get("name")
-        )
-    end
-
-    return {
-        rows = users:count()
-    }
-end)
-
-Drogua.Routes.get("/test/dbinser", function(req)
+Drogua.Routes.post("/test/db/setup", function(req)
 
     local db = Drogua.Database.get("default")
 
@@ -52,15 +25,133 @@ Drogua.Routes.get("/test/dbinser", function(req)
         )
     ]])
 
-    db:exec([[
-        INSERT INTO users (name)
-        VALUES ('Alice')
-    ]])
+    return {
+        message = "Users table is ready"
+    }
+end)
 
-    db:exec([[
+
+-- ============================================================
+-- Normal database INSERT
+-- ============================================================
+
+Drogua.Routes.post("/test/db/add", function(req)
+
+    local db = Drogua.Database.get("default")
+
+    local result = db:query([[
         INSERT INTO users (name)
-        VALUES ('Bob')
-    ]])
+        VALUES (?)
+    ]], {"Normal User"})
+
+    return {
+        message = "User inserted",
+        affectedRows = result:affectedRows(),
+        insertId = result:insertId()
+    }
+end)
+
+
+-- ============================================================
+-- Transaction test #1
+--
+-- Both INSERTs should be committed.
+-- ============================================================
+
+Drogua.Routes.post("/test/transaction/commit", function(req)
+
+    local db = Drogua.Database.get("default")
+
+    local tx = db:begin()
+
+    tx:query([[
+        INSERT INTO users (name)
+        VALUES (?)
+    ]], {"Transaction Alice"})
+
+    tx:query([[
+        INSERT INTO users (name)
+        VALUES (?)
+    ]], {"Transaction Bob"})
+
+    tx:commit()
+
+    return {
+        message = "Transaction committed",
+        expected = "2 users inserted"
+    }
+end)
+
+
+-- ============================================================
+-- Transaction test #2
+--
+-- The second query intentionally fails.
+--
+-- The first INSERT should therefore be rolled back as well.
+-- ============================================================
+
+Drogua.Routes.post("/test/transaction/rollback", function(req)
+
+    local db = Drogua.Database.get("default")
+
+    local tx = db:begin()
+
+    tx:query([[
+        INSERT INTO users (name)
+        VALUES (?)
+    ]], {"Rollback Alice"})
+
+    -- This intentionally fails because the column does not exist.
+    --
+    -- Drogon's transaction should automatically rollback.
+    tx:query([[
+        INSERT INTO users (this_column_does_not_exist)
+        VALUES (?)
+    ]], {"Rollback Bob"})
+
+    -- This should never be reached because the query above throws.
+    tx:commit()
+
+    return {
+        message = "This should never happen"
+    }
+end)
+
+
+-- ============================================================
+-- Transaction test #3
+--
+-- Explicit rollback.
+-- ============================================================
+
+Drogua.Routes.post("/test/transaction/explicit-rollback", function(req)
+
+    local db = Drogua.Database.get("default")
+
+    local tx = db:begin()
+
+    tx:query([[
+        INSERT INTO users (name)
+        VALUES (?)
+    ]], {"Explicit Rollback User"})
+
+    tx:rollback()
+
+    return {
+        message = "Transaction rolled back",
+        expected = "user should NOT exist"
+    }
+end)
+
+
+-- ============================================================
+-- List all users
+-- ============================================================
+
+Drogua.Routes.get("/test/db/users", function(req)
+
+    local db = Drogua.Database.get("default")
 
     local users = db:query([[
         SELECT id, name
@@ -68,10 +159,28 @@ Drogua.Routes.get("/test/dbinser", function(req)
         ORDER BY id
     ]])
 
+    return users:toTable()
+end)
+
+
+-- ============================================================
+-- Transaction SELECT test
+-- ============================================================
+
+Drogua.Routes.get("/test/transaction/select", function(req)
+
+    local db = Drogua.Database.get("default")
+
+    local tx = db:begin()
+
+    local users = tx:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
     for i = 0, users:count() - 1 do
         local row = users:row(i)
-
-        Drogua.print(row:toString())
 
         Drogua.print(
             "id=" .. row:get("id") ..
@@ -79,94 +188,10 @@ Drogua.Routes.get("/test/dbinser", function(req)
         )
     end
 
-    return {
-        message = "Database test completed",
-        rows = users:count()
-    }
+    tx:commit()
+
+    return users:toTable()
 end)
 
-Drogua.Routes.get("/test/db/data", function(req)
-
-    local db = Drogua.Database.get("default")
-
-    local users = db:query([[
-        SELECT id, name
-        FROM users
-        ORDER BY id
-    ]])
-
-    local data = {}
-
-    for i = 0, users:count() - 1 do
-        local row = users:row(i)
-
-        table.insert(data, {
-            id = row:get("id"),
-            name = row:get("name")
-        })
-    end
-
-    Drogua.print("Lua data type: " .. type(data))
-    Drogua.print("Lua data length: " .. #data)
-    Drogua.print("First user: " .. data[1].name)
-
-    return data
-end)
-
-Drogua.Routes.get("/test/db/data/{id}", function(req, id)
-
-    local db = Drogua.Database.get("default")
-
-    local users = db:query([[
-        SELECT id, name
-        FROM users
-        ORDER BY id
-    ]])
-
-    local data = {}
-
-    --[[    This is one way to access the data ]]
-    -- for i = 0, users:count() - 1 do
-    --     local row = users:row(i)
-
-    --     if row:get("id") == id then
-    --         table.insert(data, {
-    --             id = row:get("id"),
-    --             name = row:get("name")
-    --         })
-    --     end
-    -- end
-
-    -- [[   This is an other way to access the data ]]
-    -- for i = 0, users:count() - 1 do
-    --     local row = users:row(i)
-
-    --     if tonumber(row:get("id")) == tonumber(id) then
-    --         table.insert(data, {
-    --             id = row:get("id"),
-    --             name = row:get("name")
-    --         })
-    --     end
-    -- end
-
-    -- [[ This is yet another way to access the data ]]
-    -- for i = 0, users:count() - 1 do
-    --     local row = users:row(i)
-
-    --     if i == tonumber(id) - 1 then
-    --         table.insert(data, {
-    --             id = row:get("id"),
-    --             name = row:get("name")
-    --         })
-    --     end
-    -- end
-
-    -- this tests the toTable function
-    data = users:toTable()
-
-
-    return data
-end)
 
 Drogua.app():run()
-
