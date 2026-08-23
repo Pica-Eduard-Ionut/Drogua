@@ -82,6 +82,9 @@ LuaTransaction::~LuaTransaction() {
         catch (...) {
             // Never throw from a destructor.
         }
+
+        transaction_.reset();
+        finished_ = true;
     }
 }
 
