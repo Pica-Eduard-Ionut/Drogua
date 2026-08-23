@@ -47,24 +47,18 @@ std::shared_ptr<LuaResult> LuaDatabase::query(const std::string& sql, const luab
 
     try {
         auto binder = (*client_) << sql;
-        const auto length = params.length();
-
-        for (int i = 1; i <= length; ++i) {
-            luabridge::LuaRef value(params[i]);
-            if (value.isNil()) binder << nullptr;
-            else if (value.isBool()) binder << value.cast<bool>().value();
-            else if (value.isNumber()) binder << value.cast<double>().value();
-            else if (value.isString()) binder << value.cast<std::string>().value();
-            else throw std::runtime_error("Unsupported database parameter at index " + std::to_string(i));
-        }
-
+        bindLuaParameters(binder, params);
         binder << drogon::orm::Mode::Blocking;
+
         drogon::orm::Result result(nullptr);
         binder >> [&result](const drogon::orm::Result& r) { result = r; };
         binder.exec();
+
         return std::make_shared<LuaResult>(std::move(result));
+    
     } catch (const drogon::orm::DrogonDbException& e) {
         throw std::runtime_error("Database error [" + name_ + "]: " + std::string(e.base().what()));
+    
     } catch (const std::exception& e) {
         throw std::runtime_error("Database error [" + name_ + "]: " + std::string(e.what()));
     }
@@ -93,17 +87,15 @@ std::shared_ptr<LuaDatabase> LuaDatabase::get(const std::string& name) {
 
 std::shared_ptr<LuaTransaction> LuaDatabase::begin() {
     if (!client_) {
-        throw std::runtime_error(
-            "LuaDatabase '" + name_ +
-            "' has no valid Drogon DbClient");
+        throw std::runtime_error("LuaDatabase '" + name_ + "' has no valid Drogon DbClient");
     }
 
     try {
-        auto transaction = client_->newTransaction(
-            [](bool success) {
+        auto transaction = client_->newTransaction([](bool success) {
                 if (success) {
                     LOG_TRACE << "Lua transaction committed";
                 }
+
                 else {
                     LOG_ERROR << "Lua transaction commit failed";
                 }
@@ -114,18 +106,12 @@ std::shared_ptr<LuaTransaction> LuaDatabase::begin() {
             std::move(transaction)
         );
     }
+
     catch (const drogon::orm::DrogonDbException& e) {
-        throw std::runtime_error(
-            "Failed to begin transaction [" +
-            name_ + "]: " +
-            std::string(e.base().what())
-        );
+        throw std::runtime_error("Failed to begin transaction [" + name_ + "]: " + std::string(e.base().what()));
     }
+
     catch (const std::exception& e) {
-        throw std::runtime_error(
-            "Failed to begin transaction [" +
-            name_ + "]: " +
-            std::string(e.what())
-        );
+        throw std::runtime_error("Failed to begin transaction [" + name_ + "]: " + std::string(e.what()));
     }
 }

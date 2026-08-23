@@ -10,6 +10,8 @@
 
 class LuaResult;
 
+void bindLuaParameters(drogon::orm::internal::SqlBinder& binder, const luabridge::LuaRef& params);
+
 class LuaTransaction {
     public:
         explicit LuaTransaction(std::shared_ptr<drogon::orm::Transaction> transaction);

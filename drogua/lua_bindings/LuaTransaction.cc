@@ -6,6 +6,61 @@
 #include <stdexcept>
 #include <utility>
 
+void bindLuaParameters(drogon::orm::internal::SqlBinder& binder, const luabridge::LuaRef& params) {
+    if (!params.isTable()) {
+        throw std::runtime_error("Database query parameters must be a Lua table");
+    }
+
+    const auto length = params.length();
+    for (int i = 1; i <= length; ++i) {
+        luabridge::LuaRef value(params[i]);
+
+        if (value.isNil()) {
+            binder << nullptr;
+        }
+
+        else if (value.isBool()) {
+            binder << value.cast<bool>().value();
+        }
+
+        else if (value.isNumber()) {
+            /*
+             * Lua 5.4 has two numeric types:
+             *  - LUA_TINTEGER
+             *  - LUA_TNUMBER
+             *
+             * LuaBridge3 exposes isNumber(), but not isInteger().
+             * casting allows to use integers when the Lua value is actually an integer.
+             */
+            lua_State* L = value.state();
+
+            value.push(L);
+
+            if (lua_isinteger(L, -1)) {
+                lua_Integer integerValue = lua_tointeger(L, -1);
+                lua_pop(L, 1);
+
+                binder << static_cast<int64_t>(integerValue);
+            }
+            
+            else {
+                lua_Number numberValue = lua_tonumber(L, -1);
+                lua_pop(L, 1);
+
+                binder << static_cast<double>(numberValue);
+            }
+        }
+
+        else if (value.isString()) {
+            binder << value.cast<std::string>().value();
+        }
+
+        else {
+            throw std::runtime_error("Unsupported database parameter at index " + std::to_string(i));
+        }
+    }
+}
+
 LuaTransaction::LuaTransaction(std::shared_ptr<drogon::orm::Transaction> transaction)
     : transaction_(std::move(transaction)) {
     if (!transaction_) {
@@ -65,36 +120,10 @@ std::shared_ptr<LuaResult> LuaTransaction::query(const std::string& sql, const l
 
     try {
         auto binder = (*transaction_) << sql;
-        const auto length = params.length();
-
-        for (int i = 1; i <= length; ++i) {
-            luabridge::LuaRef value(params[i]);
-
-            if (value.isNil()) {
-                binder << nullptr;
-            }
-
-            else if (value.isBool()) {
-                binder << value.cast<bool>().value();
-            }
-
-            else if (value.isNumber()) {
-                binder << value.cast<double>().value();
-            }
-
-            else if (value.isString()) {
-                binder << value.cast<std::string>().value();
-            }
-
-            else {
-                throw std::runtime_error(
-                    "Unsupported database parameter at index " + std::to_string(i));
-            }
-        }
-
+        bindLuaParameters(binder, params);
         binder << drogon::orm::Mode::Blocking;
-        drogon::orm::Result result(nullptr);
 
+        drogon::orm::Result result(nullptr);
         binder >> [&result](const drogon::orm::Result& r) {
             result = r;
         };
@@ -102,6 +131,7 @@ std::shared_ptr<LuaResult> LuaTransaction::query(const std::string& sql, const l
 
         return std::make_shared<LuaResult>(std::move(result));
     }
+
 
     catch (const drogon::orm::DrogonDbException& e) {
         throw std::runtime_error(
@@ -165,3 +195,4 @@ void LuaTransaction::rollback() {
     finished_ = true;
     transaction_.reset();
 }
+
