@@ -203,7 +203,7 @@ end)
 --     return users:toTable()
 -- end)
 
-Drogua.Routes.get("/test/transaction/select", function(req)
+Drogua.Routes.get("/test/transaction/{id}/test/{att}", function(req, id, att)
 
     local db = Drogua.Database.get("default")
 

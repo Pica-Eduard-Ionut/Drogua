@@ -2,14 +2,29 @@
 #include <lua.hpp>
 #include <LuaBridge/LuaBridge.h>
 
+#include "LuaMiddlewareManager.h"
+#include "LuaRequest.h"
+#include "LuaResponse.h"
+
+#include <vector>
+
 class LuaRoutes {
     public:
         static void get(const std::string& path, const luabridge::LuaRef& handler);
         static int luaGet(lua_State* L);
+
         static void post(const std::string& path, const luabridge::LuaRef& handler);
+        static int luaPost(lua_State* L);
+
         static void put(const std::string& path, const luabridge::LuaRef& handler);
+        static int luaPut(lua_State* L);
+
         static void del(const std::string& path, const luabridge::LuaRef& handler);
+        static int luaDelete(lua_State* L);
+
         static void patch(const std::string& path, const luabridge::LuaRef& handler);
+        static int luaPatch(lua_State* L);
+
         static Json::Value luaTableToJson(const luabridge::LuaRef& table);
         static Json::Value luaValueToJson(lua_State* L, int index);
 
@@ -34,4 +49,12 @@ class LuaRoutes {
         static void sendErrorResponse(const std::string& message, std::function<void(const drogon::HttpResponsePtr&)>&& callback);
 
         static size_t countPathParameters(const std::string &path);
+
+        static drogon::HttpResponsePtr executeRoute(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler,
+             const drogon::HttpRequestPtr& req, const std::vector<std::string>& params);
+
+        static drogon::HttpResponsePtr executeMiddlewareChain(const LuaMiddlewareManager::MiddlewareChain& chain, std::size_t index, LuaRequest& req,
+             LuaResponse& res, const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& httpReq, const std::vector<std::string>& params);
+
+        static int luaRegister(lua_State* L, drogon::HttpMethod method, const char* methodName);
 };
