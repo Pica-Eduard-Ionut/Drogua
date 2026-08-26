@@ -167,6 +167,42 @@ end)
 -- Transaction SELECT test
 -- ============================================================
 
+local auth = Drogua.Middleware.create(function(req, res, next)
+    print("auth")
+    next()
+end)
+
+local logging = Drogua.Middleware.create(function(req, res, next)
+    print("logging")
+    next()
+end)
+
+-- Drogua.Routes.get("/test/transaction/select", function(req)
+
+--     local db = Drogua.Database.get("default")
+
+--     local tx = db:begin()
+
+--     local users = tx:query([[
+--         SELECT id, name
+--         FROM users
+--         ORDER BY id
+--     ]])
+
+--     for i = 0, users:count() - 1 do
+--         local row = users:row(i)
+
+--         Drogua.print(
+--             "id=" .. row:get("id") ..
+--             " name=" .. row:get("name")
+--         )
+--     end
+
+--     tx:commit()
+
+--     return users:toTable()
+-- end)
+
 Drogua.Routes.get("/test/transaction/select", function(req)
 
     local db = Drogua.Database.get("default")
@@ -191,7 +227,7 @@ Drogua.Routes.get("/test/transaction/select", function(req)
     tx:commit()
 
     return users:toTable()
-end)
+end, { auth, logging })
 
 
 Drogua.app():run()

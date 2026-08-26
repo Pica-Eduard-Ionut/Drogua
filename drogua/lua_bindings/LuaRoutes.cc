@@ -1,6 +1,7 @@
 #include "LuaRoutes.h"
 #include "LuaRequest.h"
 #include "LuaResponse.h"
+#include "LuaMiddlewareManager.h"
 
 #include <stdexcept>
 #include <string>
@@ -9,6 +10,80 @@ using namespace drogon;
 
 void LuaRoutes::get(const std::string &path, const luabridge::LuaRef &handler) {
     registerRoute(path, Get, handler);
+}
+
+int LuaRoutes::luaGet(lua_State* L)
+{
+    const int argc = lua_gettop(L);
+
+    if (argc < 2 || argc > 3)
+    {
+        return luaL_error(
+            L,
+            "Drogua.Routes.get expects 2 or 3 arguments"
+        );
+    }
+
+    // Argument 1: path
+    const char* path = luaL_checkstring(L, 1);
+
+    // Argument 2: handler
+    auto handler =
+        luabridge::Stack<luabridge::LuaRef>::get(L, 2);
+
+    if (!handler)
+    {
+        return luaL_error(
+            L,
+            "Invalid route handler: %s",
+            handler.message().c_str()
+        );
+    }
+
+    // Argument 3: middleware table (optional)
+    if (argc == 3)
+    {
+        if (!lua_istable(L, 3))
+        {
+            return luaL_error(
+                L,
+                "Route middleware must be a table"
+            );
+        }
+
+        auto middleware =
+            luabridge::Stack<luabridge::LuaRef>::get(L, 3);
+
+        if (!middleware)
+        {
+            return luaL_error(
+                L,
+                "Invalid middleware table: %s",
+                middleware.message().c_str()
+            );
+        }
+
+        LuaMiddlewareManager::instance().add(
+            Get,
+            path,
+            middleware.value()
+        );
+    }
+
+    try
+    {
+        registerRoute(
+            path,
+            Get,
+            handler.value()
+        );
+    }
+    catch (const std::exception& e)
+    {
+        return luaL_error(L, "%s", e.what());
+    }
+
+    return 0;
 }
 
 void LuaRoutes::post(const std::string &path, const luabridge::LuaRef &handler) {

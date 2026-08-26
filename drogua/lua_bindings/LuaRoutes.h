@@ -5,6 +5,7 @@
 class LuaRoutes {
     public:
         static void get(const std::string& path, const luabridge::LuaRef& handler);
+        static int luaGet(lua_State* L);
         static void post(const std::string& path, const luabridge::LuaRef& handler);
         static void put(const std::string& path, const luabridge::LuaRef& handler);
         static void del(const std::string& path, const luabridge::LuaRef& handler);

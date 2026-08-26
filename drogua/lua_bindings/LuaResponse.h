@@ -7,6 +7,7 @@
 class LuaResponse {
     public:
         LuaResponse();
+        explicit LuaResponse(const drogon::HttpResponsePtr& response);
 
         // Status
         int status() const;

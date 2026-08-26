@@ -4,6 +4,11 @@ LuaResponse::LuaResponse()
     : response_(drogon::HttpResponse::newHttpResponse()),
       contentType_() {}
 
+// explicit constructor
+LuaResponse::LuaResponse(const drogon::HttpResponsePtr& response)
+    : response_(response),
+      contentType_() {}
+
 // Status
 int LuaResponse::status() const {
     return static_cast<int>(response_->statusCode());

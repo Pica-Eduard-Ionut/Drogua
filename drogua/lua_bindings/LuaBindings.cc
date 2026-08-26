@@ -10,6 +10,7 @@
 #include <lua_bindings/LuaResult.h>
 #include <lua_bindings/LuaRow.h>
 #include <lua_bindings/LuaTransaction.h>
+#include <lua_bindings/LuaMiddlewareManager.h>
 
 #include <iostream>
 #include <string>
@@ -36,7 +37,8 @@ void registerDrogua(lua_State* L) {
                 .endClass()
 
             .beginNamespace("Routes")
-                .addFunction("get", &LuaRoutes::get)
+                // .addFunction("get", &LuaRoutes::get)
+                .addFunction("get", &LuaRoutes::luaGet)
                 .addFunction("post", &LuaRoutes::post)
                 .addFunction("put", &LuaRoutes::put)
                 .addFunction("delete", &LuaRoutes::del)
@@ -115,6 +117,14 @@ void registerDrogua(lua_State* L) {
                 .addFunction("commit", &LuaTransaction::commit)
                 .addFunction("rollback", &LuaTransaction::rollback)
             .endClass()
+
+            // middleware
+            .beginClass<LuaMiddleware>("LuaMiddleware")
+            .endClass()
+
+            .beginNamespace("Middleware")
+                .addFunction("create", &LuaMiddlewareManager::luaCreate)
+            .endNamespace()
             
         .endNamespace();
 }
