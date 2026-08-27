@@ -8,26 +8,6 @@
 
 using namespace drogon;
 
-void LuaRoutes::get(const std::string &path, const luabridge::LuaRef &handler) {
-    registerRoute(path, Get, handler);
-}
-
-void LuaRoutes::post(const std::string &path, const luabridge::LuaRef &handler) {
-    registerRoute(path, Post, handler);
-}
-
-void LuaRoutes::put(const std::string &path, const luabridge::LuaRef &handler) {
-    registerRoute(path, Put, handler);
-}
-
-void LuaRoutes::del(const std::string &path, const luabridge::LuaRef &handler) {
-    registerRoute(path, Delete, handler);
-}
-
-void LuaRoutes::patch(const std::string &path, const luabridge::LuaRef &handler) {
-    registerRoute(path, Patch, handler);
-}
-
 int LuaRoutes::luaGet(lua_State* L) {
     return luaRegister(L, Get, "get");
 }

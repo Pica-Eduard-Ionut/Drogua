@@ -11,6 +11,7 @@
 using namespace drogon;
 
 namespace {
+
     std::vector<lua_State*>& luaStates() {
         static std::vector<lua_State*> states;
         return states;
@@ -33,9 +34,8 @@ namespace {
         if (luaL_dostring(L, code.c_str()) != LUA_OK) {
             const char* error = lua_tostring(L, -1);
 
-            if (error) {
+            if (error)
                 LOG_ERROR << "Lua test failed: " << error;
-            }
 
             lua_pop(L, 1);
             return false;
@@ -44,13 +44,32 @@ namespace {
         return true;
     }
 
-    luabridge::LuaRef getLuaGlobal(
-        lua_State* L,
-        const std::string& name) {
-
+    luabridge::LuaRef getLuaGlobal(lua_State* L, const std::string& name) {
         return luabridge::getGlobal(
             L,
             name.c_str());
+    }
+
+    bool callLuaRoute(lua_State* L, lua_CFunction route, const std::string& path, const luabridge::LuaRef& handler) {
+        lua_pushcfunction(L, route);
+
+        lua_pushlstring(L, path.data(), path.size());
+
+        handler.push(L);
+
+        const int status = lua_pcall(
+            L,
+            2,      // path, handler
+            0,      // no results
+            0       // no error handler
+        );
+
+        if (status != LUA_OK) {
+            lua_pop(L, 1); // remove Lua error message
+            return false;
+        }
+
+        return true;
     }
 
 } // namespace
@@ -77,8 +96,10 @@ DROGON_TEST(LuaRoutesGet) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::get(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "/unit/lua/get",
             handler
         )
@@ -107,8 +128,10 @@ DROGON_TEST(LuaRoutesPost) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::post(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPost,
             "/unit/lua/post",
             handler
         )
@@ -137,8 +160,10 @@ DROGON_TEST(LuaRoutesPut) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::put(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPut,
             "/unit/lua/put",
             handler
         )
@@ -167,8 +192,10 @@ DROGON_TEST(LuaRoutesDelete) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::del(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaDelete,
             "/unit/lua/delete",
             handler
         )
@@ -197,8 +224,10 @@ DROGON_TEST(LuaRoutesPatch) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::patch(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPatch,
             "/unit/lua/patch",
             handler
         )
@@ -227,8 +256,10 @@ DROGON_TEST(LuaRoutesGetOnePathParameter) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::get(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "/unit/lua/users/{id}",
             handler
         )
@@ -258,8 +289,10 @@ DROGON_TEST(LuaRoutesGetMultiplePathParameters) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::get(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "/unit/lua/users/{user}/posts/{post}",
             handler
         )
@@ -288,8 +321,10 @@ DROGON_TEST(LuaRoutesGetTableHandler) {
 
     REQUIRE(handler.isTable());
 
-    CHECK_NOTHROW(
-        LuaRoutes::get(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "/unit/lua/table",
             handler
         )
@@ -317,8 +352,10 @@ DROGON_TEST(LuaRoutesPostTableHandler) {
 
     REQUIRE(handler.isTable());
 
-    CHECK_NOTHROW(
-        LuaRoutes::post(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPost,
             "/unit/lua/post-table",
             handler
         )
@@ -347,8 +384,10 @@ DROGON_TEST(LuaRoutesPutPathParameters) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::put(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPut,
             "/unit/lua/put/{id}",
             handler
         )
@@ -377,8 +416,10 @@ DROGON_TEST(LuaRoutesDeletePathParameters) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::del(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaDelete,
             "/unit/lua/delete/{id}",
             handler
         )
@@ -407,8 +448,10 @@ DROGON_TEST(LuaRoutesPatchPathParameters) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::patch(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaPatch,
             "/unit/lua/patch/{id}",
             handler
         )
@@ -434,14 +477,15 @@ DROGON_TEST(LuaRoutesInvalidHandler) {
     REQUIRE(!handler.isFunction());
     REQUIRE(!handler.isTable());
 
-    CHECK_THROWS(
-        LuaRoutes::get(
+    CHECK(
+        !callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "/unit/lua/invalid-handler",
             handler
         )
     );
 }
-
 
 // ============================================================
 // Empty path
@@ -462,8 +506,10 @@ DROGON_TEST(LuaRoutesEmptyPath) {
 
     REQUIRE(handler.isFunction());
 
-    CHECK_NOTHROW(
-        LuaRoutes::get(
+    CHECK(
+        callLuaRoute(
+            L,
+            LuaRoutes::luaGet,
             "",
             handler
         )

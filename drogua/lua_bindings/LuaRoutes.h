@@ -10,19 +10,10 @@
 
 class LuaRoutes {
     public:
-        static void get(const std::string& path, const luabridge::LuaRef& handler);
         static int luaGet(lua_State* L);
-
-        static void post(const std::string& path, const luabridge::LuaRef& handler);
         static int luaPost(lua_State* L);
-
-        static void put(const std::string& path, const luabridge::LuaRef& handler);
         static int luaPut(lua_State* L);
-
-        static void del(const std::string& path, const luabridge::LuaRef& handler);
         static int luaDelete(lua_State* L);
-
-        static void patch(const std::string& path, const luabridge::LuaRef& handler);
         static int luaPatch(lua_State* L);
 
         static Json::Value luaTableToJson(const luabridge::LuaRef& table);
