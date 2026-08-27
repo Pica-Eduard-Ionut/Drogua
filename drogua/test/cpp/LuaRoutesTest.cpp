@@ -78,7 +78,6 @@ namespace {
 // ============================================================
 // GET
 // ============================================================
-
 DROGON_TEST(LuaRoutesGet) {
     lua_State* L = createLuaState();
 
@@ -110,7 +109,6 @@ DROGON_TEST(LuaRoutesGet) {
 // ============================================================
 // POST
 // ============================================================
-
 DROGON_TEST(LuaRoutesPost) {
     lua_State* L = createLuaState();
 
@@ -142,7 +140,6 @@ DROGON_TEST(LuaRoutesPost) {
 // ============================================================
 // PUT
 // ============================================================
-
 DROGON_TEST(LuaRoutesPut) {
     lua_State* L = createLuaState();
 
@@ -174,7 +171,6 @@ DROGON_TEST(LuaRoutesPut) {
 // ============================================================
 // DELETE
 // ============================================================
-
 DROGON_TEST(LuaRoutesDelete) {
     lua_State* L = createLuaState();
 
@@ -202,11 +198,9 @@ DROGON_TEST(LuaRoutesDelete) {
     );
 }
 
-
 // ============================================================
 // PATCH
 // ============================================================
-
 DROGON_TEST(LuaRoutesPatch) {
     lua_State* L = createLuaState();
 
@@ -234,11 +228,9 @@ DROGON_TEST(LuaRoutesPatch) {
     );
 }
 
-
 // ============================================================
 // GET with one path parameter
 // ============================================================
-
 DROGON_TEST(LuaRoutesGetOnePathParameter) {
     lua_State* L = createLuaState();
 
@@ -270,7 +262,6 @@ DROGON_TEST(LuaRoutesGetOnePathParameter) {
 // ============================================================
 // GET with multiple path parameters
 // ============================================================
-
 DROGON_TEST(LuaRoutesGetMultiplePathParameters) {
     lua_State* L = createLuaState();
 
@@ -303,7 +294,6 @@ DROGON_TEST(LuaRoutesGetMultiplePathParameters) {
 // ============================================================
 // GET with table handler
 // ============================================================
-
 DROGON_TEST(LuaRoutesGetTableHandler) {
     lua_State* L = createLuaState();
 
@@ -335,7 +325,6 @@ DROGON_TEST(LuaRoutesGetTableHandler) {
 // ============================================================
 // POST with table handler
 // ============================================================
-
 DROGON_TEST(LuaRoutesPostTableHandler) {
     lua_State* L = createLuaState();
 
@@ -366,7 +355,6 @@ DROGON_TEST(LuaRoutesPostTableHandler) {
 // ============================================================
 // PUT with path parameters
 // ============================================================
-
 DROGON_TEST(LuaRoutesPutPathParameters) {
     lua_State* L = createLuaState();
 
@@ -398,7 +386,6 @@ DROGON_TEST(LuaRoutesPutPathParameters) {
 // ============================================================
 // DELETE with path parameters
 // ============================================================
-
 DROGON_TEST(LuaRoutesDeletePathParameters) {
     lua_State* L = createLuaState();
 
@@ -430,7 +417,6 @@ DROGON_TEST(LuaRoutesDeletePathParameters) {
 // ============================================================
 // PATCH with path parameters
 // ============================================================
-
 DROGON_TEST(LuaRoutesPatchPathParameters) {
     lua_State* L = createLuaState();
 
@@ -462,7 +448,6 @@ DROGON_TEST(LuaRoutesPatchPathParameters) {
 // ============================================================
 // Invalid handler type
 // ============================================================
-
 DROGON_TEST(LuaRoutesInvalidHandler) {
     lua_State* L = createLuaState();
 
@@ -490,7 +475,6 @@ DROGON_TEST(LuaRoutesInvalidHandler) {
 // ============================================================
 // Empty path
 // ============================================================
-
 DROGON_TEST(LuaRoutesEmptyPath) {
     lua_State* L = createLuaState();
 

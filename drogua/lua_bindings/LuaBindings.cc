@@ -37,12 +37,7 @@ void registerDrogua(lua_State* L) {
                 .endClass()
 
             .beginNamespace("Routes")
-                // .addFunction("get", &LuaRoutes::get)
                 .addFunction("get", &LuaRoutes::luaGet)
-                // .addFunction("post", &LuaRoutes::post)
-                // .addFunction("put", &LuaRoutes::put)
-                // .addFunction("delete", &LuaRoutes::del)
-                // .addFunction("patch", &LuaRoutes::patch)
                 .addFunction("post", &LuaRoutes::luaPost)
                 .addFunction("put", &LuaRoutes::luaPut)
                 .addFunction("delete", &LuaRoutes::luaDelete)
