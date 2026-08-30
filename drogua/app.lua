@@ -177,32 +177,6 @@ local logging = Drogua.Middleware.create(function(req, res, next)
     next()
 end)
 
--- Drogua.Routes.get("/test/transaction/select", function(req)
-
---     local db = Drogua.Database.get("default")
-
---     local tx = db:begin()
-
---     local users = tx:query([[
---         SELECT id, name
---         FROM users
---         ORDER BY id
---     ]])
-
---     for i = 0, users:count() - 1 do
---         local row = users:row(i)
-
---         Drogua.print(
---             "id=" .. row:get("id") ..
---             " name=" .. row:get("name")
---         )
---     end
-
---     tx:commit()
-
---     return users:toTable()
--- end)
-
 Drogua.Routes.get("/test/transaction/{id}/test/{att}", function(req, id, att)
 
     local db = Drogua.Database.get("default")
@@ -228,6 +202,5 @@ Drogua.Routes.get("/test/transaction/{id}/test/{att}", function(req, id, att)
 
     return users:toTable()
 end, { auth, logging })
-
 
 Drogua.app():run()
