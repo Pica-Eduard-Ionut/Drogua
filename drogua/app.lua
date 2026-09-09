@@ -231,23 +231,18 @@ Drogua.Routes.getAsync("/resume", function(req)
     }
 end)
 
-Drogua.Routes.getAsync("/async-resume", function(req)
-    local id = req:query("id")
-
-    local value = coroutine.yield()
-
-    return {
-        id = id,
-        resumedWith = value
-    }
-end)
-
 Drogua.Routes.getAsync("/async-db", function(req)
-    local result = coroutine.yield()
+    local db = Drogua.Database.get("default")
+
+    local result = db:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
 
     return {
         message = "database completed",
-        result = result
+        result = result:toTable()
     }
 end)
 

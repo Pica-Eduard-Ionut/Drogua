@@ -90,6 +90,7 @@ void registerDrogua(lua_State* L) {
                 .addFunction("valid", &LuaDatabase::valid)
                 .addFunction("exec", &LuaDatabase::execute)
                 .addFunction("query", &LuaDatabase::queryLua)
+                .addFunction("queryAsync", &LuaDatabase::queryAsyncLua)
                 .addFunction("executeAffected", &LuaDatabase::executeAffected)
                 .addFunction("lastInsertId", &LuaDatabase::lastInsertId)
                 .addFunction("begin", &LuaDatabase::begin)
