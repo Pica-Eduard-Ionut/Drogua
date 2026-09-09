@@ -58,17 +58,10 @@ DROGON_TEST(LuaCoroutineManagerNormalFunction) {
     REQUIRE(function.isFunction());
 
     auto coroutine = LuaCoroutineManager::create(L);
-
-    LuaCoroutineManager::pushFunction(
-        coroutine,
-        function);
-
+    LuaCoroutineManager::pushFunction(coroutine, function);
     auto result = LuaCoroutineManager::resume(coroutine);
 
-    CHECK(
-        result.status ==
-        LuaCoroutineManager::Status::Finished);
-
+    CHECK(result.status == LuaCoroutineManager::Status::Finished);
     CHECK(result.nresults == 1);
 
     lua_State *co = LuaCoroutineManager::state(coroutine);
@@ -93,10 +86,7 @@ DROGON_TEST(LuaCoroutineManagerYieldAndResume) {
     REQUIRE(function.isFunction());
 
     auto coroutine = LuaCoroutineManager::create(L);
-
-    LuaCoroutineManager::pushFunction(
-        coroutine,
-        function);
+    LuaCoroutineManager::pushFunction(coroutine, function);
 
     /*
      * First resume:
@@ -108,10 +98,7 @@ DROGON_TEST(LuaCoroutineManagerYieldAndResume) {
      */
     auto first = LuaCoroutineManager::resume(coroutine);
 
-    CHECK(
-        first.status ==
-        LuaCoroutineManager::Status::Yielded);
-
+    CHECK(first.status == LuaCoroutineManager::Status::Yielded);
     CHECK(first.nresults == 1);
 
     lua_State *co = LuaCoroutineManager::state(coroutine);
@@ -135,15 +122,9 @@ DROGON_TEST(LuaCoroutineManagerYieldAndResume) {
      */
     lua_pushinteger(co, 32);
 
-    auto second =
-        LuaCoroutineManager::resume(
-            coroutine,
-            1);
+    auto second = LuaCoroutineManager::resume(coroutine, 1);
 
-    CHECK(
-        second.status ==
-        LuaCoroutineManager::Status::Finished);
-
+    CHECK(second.status == LuaCoroutineManager::Status::Finished);
     CHECK(second.nresults == 1);
 
     CHECK(lua_isinteger(co, -1));
@@ -164,18 +145,9 @@ DROGON_TEST(LuaCoroutineManagerError) {
     REQUIRE(function.isFunction());
 
     auto coroutine = LuaCoroutineManager::create(L);
-
-    LuaCoroutineManager::pushFunction(
-        coroutine,
-        function);
-
+    LuaCoroutineManager::pushFunction(coroutine, function);
     auto result = LuaCoroutineManager::resume(coroutine);
 
-    CHECK(
-        result.status ==
-        LuaCoroutineManager::Status::Error);
-
-    CHECK(
-        result.error.find("coroutine test error") !=
-        std::string::npos);
+    CHECK(result.status == LuaCoroutineManager::Status::Error);
+    CHECK(result.error.find("coroutine test error") != std::string::npos);
 }

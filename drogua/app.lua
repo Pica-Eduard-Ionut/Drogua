@@ -209,4 +209,37 @@ Drogua.Routes.get("/benchmark", function(req)
     return resp
 end)
 
+Drogua.Routes.getAsync("/async", function(req)
+    return {
+        message = "async works"
+    }
+end)
+
+Drogua.Routes.getAsync("/yield", function(req)
+    coroutine.yield("waiting")
+
+    return {
+        message = "should not complete"
+    }
+end)
+
+Drogua.Routes.getAsync("/resume", function(req)
+    local value = coroutine.yield()
+
+    return {
+        message = value
+    }
+end)
+
+Drogua.Routes.getAsync("/async-resume", function(req)
+    local id = req:query("id")
+
+    local value = coroutine.yield()
+
+    return {
+        id = id,
+        resumedWith = value
+    }
+end)
+
 Drogua.app():run()

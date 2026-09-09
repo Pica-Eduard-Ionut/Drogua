@@ -37,11 +37,18 @@ void registerDrogua(lua_State* L) {
                 .endClass()
 
             .beginNamespace("Routes")
+                // sync routes
                 .addFunction("get", &LuaRoutes::luaGet)
                 .addFunction("post", &LuaRoutes::luaPost)
                 .addFunction("put", &LuaRoutes::luaPut)
                 .addFunction("delete", &LuaRoutes::luaDelete)
                 .addFunction("patch", &LuaRoutes::luaPatch)
+                // async routes
+                .addFunction("getAsync", &LuaRoutes::luaGetAsync)
+                .addFunction("postAsync", &LuaRoutes::luaPostAsync)
+                .addFunction("putAsync", &LuaRoutes::luaPutAsync)
+                .addFunction("deleteAsync", &LuaRoutes::luaDeleteAsync)
+                .addFunction("patchAsync", &LuaRoutes::luaPatchAsync)
             .endNamespace()
 
             .beginClass<LuaRequest>("Request")
