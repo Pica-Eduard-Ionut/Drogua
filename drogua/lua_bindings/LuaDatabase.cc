@@ -115,3 +115,27 @@ std::shared_ptr<LuaTransaction> LuaDatabase::begin() {
         throw std::runtime_error("Failed to begin transaction [" + name_ + "]: " + std::string(e.what()));
     }
 }
+
+void LuaDatabase::queryAsync(const std::string &sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string &)> errorCallback) {
+    if (!client_) {
+        throw std::runtime_error("LuaDatabase '" + name_ + "' has no valid Drogon DbClient");
+    }
+
+    if (!callback) {
+        throw std::runtime_error("LuaDatabase async query callback is empty");
+    }
+
+    if (!errorCallback) {
+        throw std::runtime_error("LuaDatabase async error callback is empty");
+    }
+
+    client_->execSqlAsync(
+        sql,
+        [callback](const drogon::orm::Result &result) {
+            callback(std::make_shared<LuaResult>(result));
+        },
+        [errorCallback](const drogon::orm::DrogonDbException &e) {
+            errorCallback(e.base().what());
+        }
+    );
+}

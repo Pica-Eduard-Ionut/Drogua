@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <string>
+#include <functional>
 
 class LuaResult;
 
@@ -32,6 +33,9 @@ class LuaDatabase {
         unsigned long long lastInsertId(const std::string& sql);
         
         std::shared_ptr<LuaTransaction> begin();
+
+        // async
+        void queryAsync(const std::string& sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback);
 
     private:
         std::string name_;

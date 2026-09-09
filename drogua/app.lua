@@ -242,4 +242,13 @@ Drogua.Routes.getAsync("/async-resume", function(req)
     }
 end)
 
+Drogua.Routes.getAsync("/async-db", function(req)
+    local result = coroutine.yield()
+
+    return {
+        message = "database completed",
+        result = result
+    }
+end)
+
 Drogua.app():run()

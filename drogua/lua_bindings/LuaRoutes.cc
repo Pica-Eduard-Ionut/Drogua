@@ -526,7 +526,7 @@ int LuaRoutes::luaRegisterAsync(lua_State *L, drogon::HttpMethod method, const c
                 return luaL_error(L, "Invalid middleware table: %s", middleware.message().c_str());
             }
 
-            LuaMiddlewareManager::instance().add(method, path, middleware.value());
+            // LuaMiddlewareManager::instance().add(method, path, middleware.value());
 
             if (argc == 3) {
                 if (!lua_istable(L, 3)) {
@@ -611,53 +611,79 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef &handler, const 
     context->request = std::make_unique<LuaRequest>(req);
     context->params = params;
     context->callback = std::move(callback);
-
     context->coroutine = LuaCoroutineManager::create(L);
 
     LuaCoroutineManager::pushFunction(context->coroutine, handler);
 
     lua_State *co = LuaCoroutineManager::state(context->coroutine);
 
+    // Push LuaRequest as the first argument.
     auto pushResult = luabridge::Stack<LuaRequest *>::push(co, context->request.get());
 
     if (!pushResult) {
         throw std::runtime_error("Failed to push LuaRequest: " + pushResult.message());
     }
 
+    // Push path parameters.
     for (const auto &param : params) {
         lua_pushlstring(co, param.data(), param.size());
     }
 
+    // Start the coroutine.
     auto resumeResult = LuaCoroutineManager::resume(context->coroutine, 1 + static_cast<int>(params.size()));
 
+    // =========================================================
+    // Coroutine yielded.
+    //
+    // Start the asynchronous database operation.
+    // =========================================================
     if (resumeResult.status == LuaCoroutineManager::Status::Yielded) {
-        // Fake async operation for now.
-        //
-        // Later this will be replaced by the
-        // asynchronous database callback.
+        auto db = LuaDatabase::get("default");
 
-        drogon::app().getLoop()->runAfter(
-            1.0,
-            [context]()
-            {
-                std::string id = context->request->query("id");
+        if (!db || !db->valid()) {
+            throw std::runtime_error("Async route could not access default database");
+        }
 
-                LuaRoutes::resumeAsyncRoute(
-                    context,
-                    "hello from resume for " + id);
-            });
+        db->queryAsync(
+            R"(
+                SELECT id, name
+                FROM users
+                ORDER BY id
+            )",
+            // Database query succeeded.
+            [context](std::shared_ptr<LuaResult> result) {
+                LuaRoutes::resumeAsyncRoute(context, [result](lua_State *co) {
+                    // Push the database result as
+                    // a normal Lua table.
+                    result->pushTable(co);
+                });
+            },
+            // Database query failed.
+            [context](const std::string &error) {
+                LuaRoutes::sendErrorResponse("Async database query failed: " + error, std::move(context->callback));
+            }
+        );
 
         return;
     }
 
+    // =========================================================
+    // Coroutine failed immediately.
+    // =========================================================
     if (resumeResult.status == LuaCoroutineManager::Status::Error) {
         throw std::runtime_error("Lua async route handler failed: " + resumeResult.error);
     }
 
+    // =========================================================
+    // Unexpected coroutine state.
+    // =========================================================
     if (resumeResult.status != LuaCoroutineManager::Status::Finished) {
         throw std::runtime_error("Unknown async coroutine state");
     }
 
+    // =========================================================
+    // Coroutine finished immediately.
+    // =========================================================
     if (resumeResult.nresults < 1) {
         throw std::runtime_error("Lua async route handler must return a table or Drogua.Response");
     }
@@ -670,6 +696,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef &handler, const 
 
     auto luaResult = result.value();
 
+    // Drogua.Response
     if (luaResult.isUserdata()) {
         auto response = luabridge::get<LuaResponse *>(co, -1);
 
@@ -679,45 +706,55 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef &handler, const 
         }
     }
 
+    // Lua table
     if (luaResult.isTable()) {
         Json::Value json = luaTableToJson(luaResult);
 
         context->callback(drogon::HttpResponse::newHttpJsonResponse(json));
-
         return;
     }
 
     throw std::runtime_error("Lua async route handler must return a table or Drogua.Response");
 }
 
-void LuaRoutes::resumeAsyncRoute(const std::shared_ptr<AsyncRouteContext> &context, const std::string &value) {
+void LuaRoutes::resumeAsyncRoute(const std::shared_ptr<AsyncRouteContext> &context, const std::function<void(lua_State *)> &pushValue) {
     if (!context) {
         return;
     }
 
     lua_State *co = LuaCoroutineManager::state(context->coroutine);
 
-    // The value passed to resume() becomes
-    // the return value of coroutine.yield().
-    lua_pushlstring(co, value.data(), value.size());
+    // The value pushed here becomes the
+    // return value of coroutine.yield().
+    if (!pushValue) {
+        sendErrorResponse("Async route resume value is empty", std::move(context->callback));
+        return;
+    }
+
+    pushValue(co);
 
     auto resumeResult = LuaCoroutineManager::resume(context->coroutine, 1);
 
+    // For now we only support one asynchronous
+    // operation per route.
     if (resumeResult.status == LuaCoroutineManager::Status::Yielded) {
         sendErrorResponse("Async route yielded more than once", std::move(context->callback));
         return;
     }
 
+    // Lua handler failed while resuming.
     if (resumeResult.status == LuaCoroutineManager::Status::Error) {
         sendErrorResponse("Lua async route handler failed: " + resumeResult.error, std::move(context->callback));
         return;
     }
 
+    // Unexpected state.
     if (resumeResult.status != LuaCoroutineManager::Status::Finished) {
         sendErrorResponse("Unknown coroutine state", std::move(context->callback));
         return;
     }
 
+    // Handler must return something.
     if (resumeResult.nresults < 1) {
         sendErrorResponse("Async route handler must return a table or Drogua.Response", std::move(context->callback));
         return;
