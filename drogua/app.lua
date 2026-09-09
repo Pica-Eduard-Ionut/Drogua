@@ -203,4 +203,10 @@ Drogua.Routes.get("/test/transaction/{id}/test/{att}", function(req, id, att)
     return users:toTable()
 end, { auth, logging })
 
+Drogua.Routes.get("/benchmark", function(req)
+    local resp = Drogua.Response()
+    resp:setBody("<p>Hello, world!</p>")
+    return resp
+end)
+
 Drogua.app():run()
