@@ -268,4 +268,22 @@ Drogua.Routes.getAsync("/async-db-params", function(req)
     }
 end)
 
+Drogua.Routes.getAsync(
+    "/async/users/{id}",
+    function(req, id)
+
+        local db = Drogua.Database.get("default")
+
+        local result = db:queryAsync(
+            "SELECT * FROM users WHERE id = ?",
+            { tonumber(id) }
+        )
+
+        return {
+            success = true,
+            user = result:toTable()
+        }
+    end
+)
+
 Drogua.app():run()
