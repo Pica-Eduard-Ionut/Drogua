@@ -38,6 +38,9 @@ class LuaDatabase {
 
         // async
         void queryAsync(const std::string& sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback);
+        // Parametrized overload
+        void queryAsync(const std::string& sql, const luabridge::LuaRef& params, std::function<void(std::shared_ptr<LuaResult>)> callback, 
+            std::function<void(const std::string&)> errorCallback);
         // Lua-facing async query
         static int queryAsyncLua(lua_State* L);
         static int queryAsyncContinuation(lua_State* L, int status, lua_KContext ctx);

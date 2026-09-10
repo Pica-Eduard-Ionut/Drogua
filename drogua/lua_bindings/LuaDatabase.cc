@@ -140,96 +140,122 @@ void LuaDatabase::queryAsync(const std::string &sql, std::function<void(std::sha
     );
 }
 
+void LuaDatabase::queryAsync(const std::string& sql, const luabridge::LuaRef& params, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback) {
+    if (!client_) {
+        throw std::runtime_error("LuaDatabase '" + name_ + "' has no valid Drogon DbClient");
+    }
+    if (!params.isTable()) {
+        throw std::runtime_error("Database query parameters must be a Lua table");
+    }
+    if (!callback) {
+        throw std::runtime_error("LuaDatabase async query callback is empty");
+    }
+    if (!errorCallback) {
+        throw std::runtime_error("LuaDatabase async error callback is empty");
+    }
+
+    auto binder = (*client_) << sql;
+    bindLuaParameters(binder, params);
+
+    binder >> [callback](const drogon::orm::Result& result) {
+        callback(std::make_shared<LuaResult>(result));
+    };
+
+    binder >> [errorCallback](const drogon::orm::DrogonDbException& e) {
+        errorCallback(e.base().what());
+    };
+
+    binder.exec();
+}
+
 int LuaDatabase::queryAsyncLua(lua_State* L) {
     if (!L) {
         return luaL_error(L, "Database queryAsync received null Lua state");
     }
-
     if (!lua_isuserdata(L, 1)) {
         return luaL_error(L, "Database queryAsync expected a DatabaseClient");
     }
 
     auto database = luabridge::get<LuaDatabase*>(L, 1);
-
     if (!database) {
         return luaL_error(L, "Invalid DatabaseClient: %s", database.message().c_str());
     }
 
     LuaDatabase* db = database.value();
-
     if (!db) {
         return luaL_error(L, "DatabaseClient is null");
     }
 
     const char* sql = luaL_checkstring(L, 2);
+    const int argc = lua_gettop(L);
 
+    /* db:queryAsync(sql) or db:queryAsync(sql, {param1, param2, ...}) */
+    if (argc < 2 || argc > 3) {
+        return luaL_error(L, "Database queryAsync expects sql and optional parameters");
+    }
+
+    /* queryAsync() must be called from an async Lua route. */
     auto context = LuaAsyncContextRegistry::get(L);
-
     if (!context) {
         return luaL_error(L, "Database queryAsync must be called from an async route");
     }
-
     if (!context->coroutine) {
         return luaL_error(L, "Database queryAsync has no active coroutine");
     }
 
-    /*
-     * Start the asynchronous database operation.
-     *
-     * IMPORTANT:
-     * The database callback must NOT directly resume Lua.
-     *
-     * Instead it stores the result/error and calls context->resume().
-     * LuaRoutes owns the coroutine resumption and HTTP response handling.
-     */
     try {
-        db->queryAsync(
-            sql,
-            // -------------------------------------------------
-            // Database success
-            // -------------------------------------------------
-            [context](std::shared_ptr<LuaResult> result) {
+        if (argc == 3) {
+            if (!lua_istable(L, 3)) {
+                return luaL_error(L, "Database queryAsync parameters must be a table");
+            }
+
+            auto paramsResult = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
+            if (!paramsResult) {
+                return luaL_error(L, "Invalid query parameters: %s", paramsResult.message().c_str());
+            }
+
+            auto params = paramsResult.value();
+            db->queryAsync(sql, params, [context](std::shared_ptr<LuaResult> result) {
                 context->asyncResult = std::move(result);
                 context->asyncError.clear();
-
                 if (context->resume) {
                     context->resume();
+                } else {
+                    LOG_ERROR << "Lua async database query completed, but no resume handler is installed";
                 }
-
-                else {
-                    LOG_ERROR << "Lua async database query completed, "
-                                 "but no resume handler is installed";
-                }
-            },
-            // -------------------------------------------------
-            // Database failure
-            // -------------------------------------------------
-            [context](const std::string& error) {
+            }, [context](const std::string& error) {
                 context->asyncResult.reset();
                 context->asyncError = error;
-
                 if (context->resume) {
                     context->resume();
+                } else {
+                    LOG_ERROR << "Lua async database query failed, but no resume handler is installed";
                 }
-
-                else {
-                    LOG_ERROR << "Lua async database query failed, "
-                                 "but no resume handler is installed";
+            });
+        } else {
+            db->queryAsync(sql, [context](std::shared_ptr<LuaResult> result) {
+                context->asyncResult = std::move(result);
+                context->asyncError.clear();
+                if (context->resume) {
+                    context->resume();
+                } else {
+                    LOG_ERROR << "Lua async database query completed, but no resume handler is installed";
                 }
-            }
-        );
-    }
-
-    catch (const std::exception& e) {
+            }, [context](const std::string& error) {
+                context->asyncResult.reset();
+                context->asyncError = error;
+                if (context->resume) {
+                    context->resume();
+                } else {
+                    LOG_ERROR << "Lua async database query failed, but no resume handler is installed";
+                }
+            });
+        }
+    } catch (const std::exception& e) {
         return luaL_error(L, "Async database query failed: %s", e.what());
     }
 
-    /*
-     * Suspend the Lua coroutine.
-     *
-     * The database callback will eventually invoke context->resume(),
-     * which causes LuaRoutes to resume this coroutine.
-     */
+    /* Suspend the Lua coroutine. The database callback will eventually call context->resume(). */
     return lua_yieldk(L, 0, 0, &LuaDatabase::queryAsyncContinuation);
 }
 

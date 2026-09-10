@@ -621,9 +621,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         throw std::runtime_error("Lua async route handler has null Lua state");
     }
 
-    /*
-     * Create coroutine.
-     */
+    // Create coroutine
     context->coroutine = LuaCoroutineManager::create(L);
 
     if (!context->coroutine) {
@@ -715,9 +713,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
             auto luaResult = result.value();
 
-            /*
-             * Drogua.Response / LuaResponse.
-             */
+            // Drogua.Response / LuaResponse
             if (luaResult.isUserdata()) {
                 auto response = luabridge::get<LuaResponse*>(co, -1);
                 if (response) {
@@ -727,9 +723,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
                 }
             }
 
-            /*
-             * Normal Lua table -> JSON.
-             */
+            // Normal Lua table -> JSON
             if (luaResult.isTable()) {
                 try {
                     Json::Value json = LuaRoutes::luaTableToJson(luaResult);
@@ -753,30 +747,22 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         });
     };
 
-    /*
-     * Push handler.
-     */
+    // Push handler
     LuaCoroutineManager::pushFunction(context->coroutine, handler);
 
-    /*
-     * Push LuaRequest.
-     */
+    // Push LuaRequest
     auto pushResult = luabridge::Stack<LuaRequest*>::push(co, context->request.get());
 
     if (!pushResult) {
         throw std::runtime_error("Failed to push LuaRequest: " + pushResult.message());
     }
 
-    /*
-     * Push route parameters.
-     */
+    // Push route parameters
     for (const auto& param : params) {
         lua_pushlstring(co, param.data(), param.size());
     }
 
-    /*
-     * Initial coroutine execution.
-     */
+    // Initial coroutine execution
     const int argumentCount = 1 + static_cast<int>(params.size());
     auto resumeResult = LuaCoroutineManager::resume(context->coroutine, argumentCount);
 
@@ -790,16 +776,12 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         return;
     }
 
-    /*
-     * Lua failed before yielding.
-     */
+    // Lua failed before yielding
     if (resumeResult.status == LuaCoroutineManager::Status::Error) {
         throw std::runtime_error("Lua async route handler failed: " + resumeResult.error);
     }
 
-    /*
-     * Synchronous completion.
-     */
+    // Synchronous completion
     if (resumeResult.status != LuaCoroutineManager::Status::Finished) {
         throw std::runtime_error("Unknown async coroutine state");
     }
@@ -815,9 +797,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
     auto luaResult = result.value();
 
-    /*
-     * LuaResponse.
-     */
+    // LuaResponse
     if (luaResult.isUserdata()) {
         auto response = luabridge::get<LuaResponse*>(co, -1);
         if (response) {
@@ -827,9 +807,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         }
     }
 
-    /*
-     * Lua table.
-     */
+    // Lua Table
     if (luaResult.isTable()) {
         Json::Value json = LuaRoutes::luaTableToJson(luaResult);
         context->callback(drogon::HttpResponse::newHttpJsonResponse(json));

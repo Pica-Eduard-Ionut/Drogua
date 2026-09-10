@@ -62,7 +62,7 @@ class LuaRoutes {
         static void executeHandlerAsync(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
         static void executeLuaFunctionAsync(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
         static void executeRouteAsync(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-        // static void resumeAsyncRoute(const std::shared_ptr<AsyncRouteContext>& context, const std::string& value);
+        static void cleanupAsyncContext(const std::shared_ptr<LuaAsyncContext>& context);
         static void resumeAsyncRoute(const std::shared_ptr<LuaAsyncContext>& context, const std::function<void(lua_State*)>& pushValue);
         // ============================================================
 
