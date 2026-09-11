@@ -93,3 +93,36 @@ DROGON_TEST(LuaMiddlewareIntegration) {
     CHECK(runLuaFile(L, "lua/test_middleware.lua"));
     CHECK(runLuaFile(L, "lua/test_middleware_http.lua"));
 }
+
+DROGON_TEST(LuaAsyncRoutesIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_async_routes.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_routes_http.lua"));
+}
+
+DROGON_TEST(LuaAsyncDatabaseIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_async_database.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_database_http.lua"));
+}
+
+DROGON_TEST(LuaAsyncTransactionIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_async_transaction.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_transaction_http.lua"));
+}

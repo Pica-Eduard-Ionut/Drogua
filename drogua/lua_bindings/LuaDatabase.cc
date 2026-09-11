@@ -341,8 +341,9 @@ void LuaDatabase::beginAsync(std::function<void(std::shared_ptr<LuaTransaction>)
     }
 
     try {
-        client_->newTransactionAsync([callback](const std::shared_ptr<drogon::orm::Transaction>& transaction) {
+        client_->newTransactionAsync([callback, errorCallback](const std::shared_ptr<drogon::orm::Transaction>& transaction) {
             if (!transaction) {
+                errorCallback("Failed to create database transaction");
                 return;
             }
 
@@ -390,7 +391,7 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
             [context](std::shared_ptr<LuaTransaction> transaction) {
                 context->asyncError.clear();
 
-                // Temporarily store the transaction using the async context. We will add this field in the next step.
+                // Store the transaction until the Lua continuation resumes.
                 context->transaction = std::move(transaction);
 
                 if (context->resume) {
