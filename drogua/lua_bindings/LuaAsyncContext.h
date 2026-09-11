@@ -11,6 +11,7 @@
 #include "LuaCoroutineManager.h"
 #include "LuaRequest.h"
 #include "LuaResult.h"
+#include "LuaTransaction.h"
 
 struct LuaAsyncContext {
     LuaCoroutineManager::Ptr coroutine;
@@ -25,6 +26,8 @@ struct LuaAsyncContext {
     // Result/error from an asynchronous operation
     std::shared_ptr<LuaResult> asyncResult;
     std::string asyncError;
+
+    std::shared_ptr<LuaTransaction> transaction;
 
     std::function<void()> resume;
 };

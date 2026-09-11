@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <functional>
 
 class LuaResult;
 
@@ -31,6 +32,13 @@ class LuaTransaction {
 
         void commit();
         void rollback();
+
+        // async
+        void queryAsync(const std::string& sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback);
+        void queryAsync(const std::string& sql, const luabridge::LuaRef& params, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback);
+        static int queryAsyncLua(lua_State* L);
+        static int queryAsyncContinuation(lua_State* L, int status, lua_KContext ctx);
+
 
     private:
         std::shared_ptr<drogon::orm::Transaction> transaction_;

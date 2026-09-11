@@ -94,6 +94,8 @@ void registerDrogua(lua_State* L) {
                 .addFunction("executeAffected", &LuaDatabase::executeAffected)
                 .addFunction("lastInsertId", &LuaDatabase::lastInsertId)
                 .addFunction("begin", &LuaDatabase::begin)
+                // async
+                .addFunction("beginAsync", &LuaDatabase::beginAsyncLua)
             .endClass()
 
             .beginClass<LuaResult>("DatabaseResult")
@@ -123,6 +125,8 @@ void registerDrogua(lua_State* L) {
                 .addFunction("lastInsertId", &LuaTransaction::lastInsertId)
                 .addFunction("commit", &LuaTransaction::commit)
                 .addFunction("rollback", &LuaTransaction::rollback)
+                //async
+                .addFunction("queryAsync", &LuaTransaction::queryAsyncLua)
             .endClass()
 
             // middleware

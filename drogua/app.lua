@@ -215,22 +215,6 @@ Drogua.Routes.getAsync("/async", function(req)
     }
 end)
 
-Drogua.Routes.getAsync("/yield", function(req)
-    coroutine.yield("waiting")
-
-    return {
-        message = "should not complete"
-    }
-end)
-
-Drogua.Routes.getAsync("/resume", function(req)
-    local value = coroutine.yield()
-
-    return {
-        message = value
-    }
-end)
-
 Drogua.Routes.getAsync("/async-db", function(req)
     local db = Drogua.Database.get("default")
 
@@ -285,5 +269,90 @@ Drogua.Routes.getAsync(
         }
     end
 )
+
+Drogua.Routes.getAsync("/async-begin", function(req)
+    local db = Drogua.Database.get("default")
+
+    local tx = db:beginAsync()
+
+    local result = tx:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    tx:commit()
+
+    return {
+        success = true,
+        transactionValid = tx:valid(),
+        rows = result:toTable()
+    }
+end)
+
+Drogua.Routes.getAsync("/async-rollback", function(req)
+    local db = Drogua.Database.get("default")
+
+    local tx = db:beginAsync()
+
+    local result = tx:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    tx:rollback()
+
+    return {
+        success = true,
+        transactionValid = tx:valid(),
+        rows = result:toTable()
+    }
+end)
+
+Drogua.Routes.getAsync("/async-commit", function(req)
+    local db = Drogua.Database.get("default")
+
+    local tx = db:beginAsync()
+
+    local result = tx:queryAsync([[
+        INSERT INTO users (name)
+        VALUES ('Async Commit User')
+    ]])
+
+    tx:commit()
+
+    return {
+        success = true,
+        transactionValid = tx:valid(),
+        affected = result:affectedRows()
+    }
+end)
+
+Drogua.Routes.getAsync("/async-multiple", function(req)
+    local db = Drogua.Database.get("default")
+
+    local tx = db:beginAsync()
+
+    local users = tx:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    local count = tx:queryAsync([[
+        SELECT COUNT(*) AS total
+        FROM users
+    ]])
+
+    tx:commit()
+
+    return {
+        success = true,
+        transactionValid = tx:valid(),
+        users = users:toTable(),
+        count = count:toTable()
+    }
+end)
 
 Drogua.app():run()

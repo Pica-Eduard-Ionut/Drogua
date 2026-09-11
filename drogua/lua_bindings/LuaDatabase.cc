@@ -325,3 +325,130 @@ int LuaDatabase::queryAsyncContinuation(lua_State* L, int status, lua_KContext c
      */
     return 1;
 }
+
+// async transaction
+void LuaDatabase::beginAsync(std::function<void(std::shared_ptr<LuaTransaction>)> callback, std::function<void(const std::string&)> errorCallback) {
+    if (!client_) {
+        throw std::runtime_error("LuaDatabase '" + name_ + "' has no valid Drogon DbClient");
+    }
+
+    if (!callback) {
+        throw std::runtime_error("LuaDatabase async transaction callback is empty");
+    }
+
+    if (!errorCallback) {
+        throw std::runtime_error("LuaDatabase async transaction error callback is empty");
+    }
+
+    try {
+        client_->newTransactionAsync([callback](const std::shared_ptr<drogon::orm::Transaction>& transaction) {
+            if (!transaction) {
+                return;
+            }
+
+            callback(std::make_shared<LuaTransaction>(transaction));
+        });
+    }
+    catch (const std::exception& e) {
+        errorCallback(e.what());
+    }
+}
+
+int LuaDatabase::beginAsyncLua(lua_State* L) {
+    if (!L) {
+        return luaL_error(L, "Database beginAsync received null Lua state");
+    }
+
+    if (!lua_isuserdata(L, 1)) {
+        return luaL_error(L, "Database beginAsync expected a DatabaseClient");
+    }
+
+    auto database = luabridge::get<LuaDatabase*>(L, 1);
+
+    if (!database) {
+        return luaL_error(L, "Invalid DatabaseClient: %s", database.message().c_str());
+    }
+
+    LuaDatabase* db = database.value();
+
+    if (!db) {
+        return luaL_error(L, "DatabaseClient is null");
+    }
+
+    auto context = LuaAsyncContextRegistry::get(L);
+
+    if (!context) {
+        return luaL_error(L, "Database beginAsync must be called from an async route");
+    }
+
+    if (!context->coroutine) {
+        return luaL_error(L, "Database beginAsync has no active coroutine");
+    }
+
+    try {
+        db->beginAsync(
+            [context](std::shared_ptr<LuaTransaction> transaction) {
+                context->asyncError.clear();
+
+                // Temporarily store the transaction using the async context. We will add this field in the next step.
+                context->transaction = std::move(transaction);
+
+                if (context->resume) {
+                    context->resume();
+                }
+            },
+            [context](const std::string& error) {
+                context->transaction.reset();
+                context->asyncError = error;
+
+                if (context->resume) {
+                    context->resume();
+                }
+            });
+    }
+    catch (const std::exception& e) {
+        return luaL_error(L, "Async transaction begin failed: %s", e.what());
+    }
+
+    return lua_yieldk(L, 0, 0, &LuaDatabase::beginAsyncContinuation);
+}
+
+int LuaDatabase::beginAsyncContinuation(lua_State* L, int status, lua_KContext ctx) {
+    (void)ctx;
+
+    if (!L) {
+        return 0;
+    }
+
+    auto context = LuaAsyncContextRegistry::get(L);
+
+    if (!context) {
+        return luaL_error(L, "Database beginAsync continuation has no async context");
+    }
+
+    if (status != LUA_YIELD) {
+        return luaL_error(L, "Database beginAsync continuation resumed with unexpected status");
+    }
+
+    if (!context->asyncError.empty()) {
+        const std::string error = context->asyncError;
+        context->asyncError.clear();
+
+        return luaL_error(L, "Async transaction begin failed: %s", error.c_str());
+    }
+
+    if (!context->transaction) {
+        return luaL_error(L, "Async transaction begin completed without a transaction");
+    }
+
+    auto transaction = context->transaction;
+    context->transaction.reset();
+
+    auto pushResult = luabridge::Stack<std::shared_ptr<LuaTransaction>>::push(L, transaction);
+
+    if (!pushResult) {
+        return luaL_error(L, "Failed to push async transaction: %s", pushResult.message().c_str());
+    }
+
+    return 1;
+}

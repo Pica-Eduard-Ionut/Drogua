@@ -739,9 +739,12 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
             }
 
             if (resumeResult.status == LuaCoroutineManager::Status::Yielded) {
-                if (context->callback) {
-                    LuaRoutes::sendErrorResponse("Async route yielded more than once", std::move(context->callback));
-                }
+                /*
+                * The Lua continuation yielded again.
+                *
+                * This is a valid state for another async operation.
+                * The next async callback will resume the coroutine again.
+                */
 
                 return;
             }

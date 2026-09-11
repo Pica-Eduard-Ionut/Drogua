@@ -36,6 +36,11 @@ class LuaDatabase {
         
         std::shared_ptr<LuaTransaction> begin();
 
+        // async transaction
+        void beginAsync(std::function<void(std::shared_ptr<LuaTransaction>)> callback, std::function<void(const std::string&)> errorCallback);
+        static int beginAsyncLua(lua_State* L);
+        static int beginAsyncContinuation(lua_State* L, int status, lua_KContext ctx);
+
         // async
         void queryAsync(const std::string& sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback);
         // Parametrized overload
