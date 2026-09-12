@@ -182,36 +182,44 @@ Json::Value LuaRoutes::luaTableToJson(const luabridge::LuaRef &table) {
     return result;
 }
 
-void LuaRoutes::registerRoute(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
+void LuaRoutes::registerRoute(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler) {
     if (!handler.isTable() && !handler.isFunction())
         throw std::runtime_error("Route requires a Lua table or function");
 
-    switch (const size_t count = countPathParameters(path)) {
+    switch (countPathParameters(path)) {
         case 0:
-            registerRoute0(path, method, handler);
+            registerRouteImpl<>(path, method, handler);
             break;
+
         case 1:
-            registerRoute1(path, method, handler);
+            registerRouteImpl<std::string>(path, method, handler);
             break;
+
         case 2:
-            registerRoute2(path, method, handler);
+            registerRouteImpl<std::string, std::string>(path, method, handler);
             break;
+
         case 3:
-            registerRoute3(path, method, handler);
+            registerRouteImpl<std::string, std::string, std::string>(path, method, handler);
             break;
+
         case 4:
-            registerRoute4(path, method, handler);
+            registerRouteImpl<std::string, std::string, std::string, std::string>(path, method, handler);
             break;
+
         case 5:
-            registerRoute5(path, method, handler);
+            registerRouteImpl<std::string, std::string, std::string, std::string, std::string>(path, method, handler);
             break;
+
         case 6:
-            registerRoute6(path, method, handler);
+            registerRouteImpl<std::string, std::string, std::string, std::string, std::string, std::string>(path, method, handler);
             break;
+
         default:
             throw std::runtime_error("Routes may have at most 6 path parameters");
     }
 }
+
 
 drogon::HttpResponsePtr LuaRoutes::executeHandler(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params) {
     if (handler.isTable())
@@ -373,92 +381,6 @@ drogon::HttpResponsePtr LuaRoutes::executeRoute(const std::string &path, drogon:
     return executeHandler(handler, req, params);
 }
 
-// == register route for 1..6 path parameters methods
-void LuaRoutes::registerRoute0(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute1(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute2(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1, p2});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute3(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1, p2, p3});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute4(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1, p2, p3, p4});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute5(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4, std::string p5) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1, p2, p3, p4, p5});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerRoute6(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4, std::string p5, std::string p6) {
-        try {
-            auto response = LuaRoutes::executeRoute(path, method, handler, req, {p1, p2, p3, p4, p5, p6});
-            callback(std::move(response));
-        }
-        catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-// == end of this part
-
 int LuaRoutes::luaRegisterAsync(lua_State* L, drogon::HttpMethod method, const char* methodName) {
     const int argc = lua_gettop(L);
     if (argc < 2 || argc > 3) {
@@ -500,116 +422,42 @@ int LuaRoutes::luaRegisterAsync(lua_State* L, drogon::HttpMethod method, const c
     return 0;
 }
 
-void LuaRoutes::registerAsyncRoute(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler)
-{
+void LuaRoutes::registerAsyncRoute(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler) {
     if (!handler.isTable() && !handler.isFunction())
-    {
         throw std::runtime_error("Async route requires a Lua table or function");
+
+    switch (countPathParameters(path)) {
+        case 0:
+            registerAsyncRouteImpl<>(path, method, handler);
+            break;
+
+        case 1:
+            registerAsyncRouteImpl<std::string>(path, method, handler);
+            break;
+
+        case 2:
+            registerAsyncRouteImpl<std::string, std::string>(path, method, handler);
+            break;
+
+        case 3:
+            registerAsyncRouteImpl<std::string, std::string, std::string>(path, method, handler);
+            break;
+
+        case 4:
+            registerAsyncRouteImpl<std::string, std::string, std::string, std::string>(path, method, handler);
+            break;
+
+        case 5:
+            registerAsyncRouteImpl<std::string, std::string, std::string, std::string, std::string>(path, method, handler);
+            break;
+
+        case 6:
+            registerAsyncRouteImpl<std::string, std::string, std::string, std::string, std::string, std::string>(path, method, handler);
+            break;
+
+        default:
+            throw std::runtime_error("Async routes may have at most 6 path parameters");
     }
-
-    switch (const size_t count = countPathParameters(path))
-    {
-    case 0:
-        registerAsyncRoute0(path, method, handler);
-        break;
-    case 1:
-        registerAsyncRoute1(path, method, handler);
-        break;
-    case 2:
-        registerAsyncRoute2(path, method, handler);
-        break;
-    case 3:
-        registerAsyncRoute3(path, method, handler);
-        break;
-    case 4:
-        registerAsyncRoute4(path, method, handler);
-        break;
-    case 5:
-        registerAsyncRoute5(path, method, handler);
-        break;
-    case 6:
-        registerAsyncRoute6(path, method, handler);
-        break;
-    default:
-        throw std::runtime_error("Async routes may have at most 6 path parameters");
-    }
-}
-
-void LuaRoutes::registerAsyncRoute0(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute1(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute2(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1, p2}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute3(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1, p2, p3}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute4(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1, p2, p3, p4}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute5(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4, std::string p5) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1, p2, p3, p4, p5}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
-}
-
-void LuaRoutes::registerAsyncRoute6(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler) {
-    app().registerHandler(path, [handler, method, path](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback, std::string p1, std::string p2, std::string p3, std::string p4, std::string p5, std::string p6) {
-        try {
-            LuaRoutes::executeRouteAsync(path, method, handler, req, {p1, p2, p3, p4, p5, p6}, std::move(callback));
-
-        } catch (const std::exception& e) {
-            LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-        }
-    }, {method});
 }
 
 void LuaRoutes::executeRouteAsync(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback) {

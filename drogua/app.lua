@@ -500,5 +500,15 @@ Drogua.Routes.getAsync(
     }
 )
 
+Drogua.Routes.getAsync(
+    "/async/{a}/{b}/{c}",
+    function(req, a, b, c)
+        return {
+            a = a,
+            b = b,
+            c = c
+        }
+    end
+)
 
 Drogua.app():run()
