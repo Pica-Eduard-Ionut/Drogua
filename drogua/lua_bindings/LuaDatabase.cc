@@ -197,7 +197,7 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
      * queryAsync() must be called from an async Lua route.
      * The route context provides the coroutine/resume machinery.
      */
-    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncRouteContext>(L);
     if (!routeContext) {
         return luaL_error(L, "Database queryAsync must be called from an async route");
     }
@@ -382,7 +382,7 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
     }
 
     // beginAsync is started from the route context.
-    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncRouteContext>(L);
     if (!routeContext) {
         return luaL_error(L, "Database beginAsync must be called from an async route");
     }
