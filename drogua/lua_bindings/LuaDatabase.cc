@@ -385,38 +385,46 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
         return luaL_error(L, "DatabaseClient is null");
     }
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    // beginAsync is started from the route context.
+    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
 
-    if (!context) {
+    if (!routeContext) {
         return luaL_error(L, "Database beginAsync must be called from an async route");
     }
 
-    if (!context->coroutine) {
+    if (!routeContext->coroutine) {
         return luaL_error(L, "Database beginAsync has no active coroutine");
     }
 
+    // Create the transaction context.
+    auto transactionContext = std::make_shared<LuaAsyncTransactionContext>();
+
+    transactionContext->coroutine = routeContext->coroutine;
+    transactionContext->callback = routeContext->callback;
+    transactionContext->resume = routeContext->resume;
+
+    // Register the transaction context.
+    LuaAsyncContextRegistry::set<LuaAsyncTransactionContext>(L, transactionContext);
+
     try {
-        db->beginAsync(
-            [context](std::shared_ptr<LuaTransaction> transaction) {
-                context->asyncError.clear();
+        db->beginAsync([transactionContext](std::shared_ptr<LuaTransaction> transaction) {
+            transactionContext->asyncError.clear();
+            transactionContext->transaction = std::move(transaction);
 
-                // Store the transaction until the Lua continuation resumes.
-                context->transaction = std::move(transaction);
+            if (transactionContext->resume) {
+                transactionContext->resume();
+            }
+        }, [transactionContext](const std::string& error) {
+            transactionContext->transaction.reset();
+            transactionContext->asyncError = error;
 
-                if (context->resume) {
-                    context->resume();
-                }
-            },
-            [context](const std::string& error) {
-                context->transaction.reset();
-                context->asyncError = error;
-
-                if (context->resume) {
-                    context->resume();
-                }
-            });
+            if (transactionContext->resume) {
+                transactionContext->resume();
+            }
+        });
     }
     catch (const std::exception& e) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction begin failed: %s", e.what());
     }
 
@@ -430,29 +438,37 @@ int LuaDatabase::beginAsyncContinuation(lua_State* L, int status, lua_KContext c
         return 0;
     }
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncTransactionContext>(L);
 
     if (!context) {
-        return luaL_error(L, "Database beginAsync continuation has no async context");
+        return luaL_error(L, "Database beginAsync continuation has no transaction async context");
     }
 
     if (status != LUA_YIELD) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Database beginAsync continuation resumed with unexpected status");
     }
 
     if (!context->asyncError.empty()) {
         const std::string error = context->asyncError;
         context->asyncError.clear();
-
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction begin failed: %s", error.c_str());
     }
 
     if (!context->transaction) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction begin completed without a transaction");
     }
 
     auto transaction = context->transaction;
     context->transaction.reset();
+
+    /*
+     * The transaction object is now owned by Lua.
+     * The temporary async transaction context is no longer needed for beginAsync().
+     */
+    LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
 
     auto pushResult = luabridge::Stack<std::shared_ptr<LuaTransaction>>::push(L, transaction);
 

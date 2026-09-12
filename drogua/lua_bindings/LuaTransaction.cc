@@ -266,90 +266,94 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
     }
 
     auto transaction = luabridge::get<LuaTransaction*>(L, 1);
-
     if (!transaction) {
         return luaL_error(L, "Invalid DatabaseTransaction: %s", transaction.message().c_str());
     }
 
     LuaTransaction* tx = transaction.value();
-
     if (!tx) {
         return luaL_error(L, "DatabaseTransaction is null");
     }
 
     const char* sql = luaL_checkstring(L, 2);
     const int argc = lua_gettop(L);
-
     if (argc < 2 || argc > 3) {
         return luaL_error(L, "Transaction queryAsync expects sql and optional parameters");
     }
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
-
-    if (!context) {
+    // The route context provides the coroutine/resume machinery.
+    auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    if (!routeContext) {
         return luaL_error(L, "Transaction queryAsync must be called from an async route");
     }
 
-    if (!context->coroutine) {
+    if (!routeContext->coroutine) {
         return luaL_error(L, "Transaction queryAsync has no active coroutine");
     }
 
+    // Create the specialized transaction async context.
+    auto context = std::make_shared<LuaAsyncTransactionContext>();
+
+    context->coroutine = routeContext->coroutine;
+    context->callback = routeContext->callback;
+    context->resume = routeContext->resume;
+
+    // Register the transaction context separately from the route context.
+    LuaAsyncContextRegistry::set<LuaAsyncTransactionContext>(L, context);
     try {
         if (argc == 3) {
             if (!lua_istable(L, 3)) {
+                LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
                 return luaL_error(L, "Transaction queryAsync parameters must be a table");
             }
 
             auto paramsResult = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
 
             if (!paramsResult) {
+                LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
                 return luaL_error(L, "Invalid query parameters: %s", paramsResult.message().c_str());
             }
 
             auto params = paramsResult.value();
 
-            tx->queryAsync(
-                sql,
-                params,
-                [context](std::shared_ptr<LuaResult> result) {
-                    context->asyncResult = std::move(result);
-                    context->asyncError.clear();
+            tx->queryAsync(sql, params, [context](std::shared_ptr<LuaResult> result) {
+                context->asyncResult = std::move(result);
+                context->asyncError.clear();
 
-                    if (context->resume) {
-                        context->resume();
-                    }
-                },
-                [context](const std::string& error) {
-                    context->asyncResult.reset();
-                    context->asyncError = error;
+                if (context->resume) {
+                    context->resume();
+                }
+            }, [context](const std::string& error) {
+                context->asyncResult.reset();
+                context->asyncError = error;
 
-                    if (context->resume) {
-                        context->resume();
-                    }
-                });
+                if (context->resume) {
+                    context->resume();
+                }
+            });
         }
+
         else {
-            tx->queryAsync(
-                sql,
-                [context](std::shared_ptr<LuaResult> result) {
-                    context->asyncResult = std::move(result);
-                    context->asyncError.clear();
+            tx->queryAsync(sql, [context](std::shared_ptr<LuaResult> result) {
+                context->asyncResult = std::move(result);
+                context->asyncError.clear();
 
-                    if (context->resume) {
-                        context->resume();
-                    }
-                },
-                [context](const std::string& error) {
-                    context->asyncResult.reset();
-                    context->asyncError = error;
+                if (context->resume) {
+                    context->resume();
+                }
+            }, [context](const std::string& error) {
+                context->asyncResult.reset();
+                context->asyncError = error;
 
-                    if (context->resume) {
-                        context->resume();
-                    }
-                });
+                if (context->resume) {
+                    context->resume();
+                }
+            });
         }
     }
+
     catch (const std::exception& e) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction query failed: %s", e.what());
     }
 
@@ -363,32 +367,34 @@ int LuaTransaction::queryAsyncContinuation(lua_State* L, int status, lua_KContex
         return 0;
     }
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
-
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncTransactionContext>(L);
     if (!context) {
-        return luaL_error(L, "Transaction queryAsync continuation has no async context");
+        return luaL_error(L, "Transaction queryAsync continuation has no transaction async context");
     }
 
     if (status != LUA_YIELD) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Transaction queryAsync continuation resumed with unexpected status");
     }
 
     if (!context->asyncError.empty()) {
         const std::string error = context->asyncError;
         context->asyncError.clear();
-
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction query failed: %s", error.c_str());
     }
 
     if (!context->asyncResult) {
+        LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction query completed without a result");
     }
 
     auto result = context->asyncResult;
     context->asyncResult.reset();
 
-    auto pushResult = luabridge::Stack<std::shared_ptr<LuaResult>>::push(L, result);
+    LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
 
+    auto pushResult = luabridge::Stack<std::shared_ptr<LuaResult>>::push(L, result);
     if (!pushResult) {
         return luaL_error(L, "Failed to push async transaction result: %s", pushResult.message().c_str());
     }

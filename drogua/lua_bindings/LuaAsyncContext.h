@@ -26,12 +26,6 @@ struct LuaAsyncContext {
 
     std::function<void(const drogon::HttpResponsePtr&)> callback;
 
-    // Result/error from an asynchronous operation
-    std::shared_ptr<LuaResult> asyncResult;
-    std::string asyncError;
-
-    std::shared_ptr<LuaTransaction> transaction;
-
     std::function<void()> resume;
 
     // middleware
@@ -39,15 +33,31 @@ struct LuaAsyncContext {
     const LuaMiddlewareManager::MiddlewareChain* middlewareChain = nullptr;
     std::unique_ptr<LuaResponse> response;
     bool hasRouteResponse = false;
+
     // async route handler
     luabridge::LuaRef handler;
-    LuaAsyncContext(lua_State* L) : handler(L) { }
+
+    LuaAsyncContext(lua_State* L)
+        : handler(L) {
+    }
 };
 
 struct LuaAsyncDatabaseContext {
     LuaCoroutineManager::Ptr coroutine;
     std::function<void()> resume;
     std::function<void(const drogon::HttpResponsePtr&)> callback;
+
     std::shared_ptr<LuaResult> asyncResult;
     std::string asyncError;
+};
+
+struct LuaAsyncTransactionContext {
+    LuaCoroutineManager::Ptr coroutine;
+    std::function<void()> resume;
+    std::function<void(const drogon::HttpResponsePtr&)> callback;
+
+    std::shared_ptr<LuaResult> asyncResult;
+    std::string asyncError;
+
+    std::shared_ptr<LuaTransaction> transaction;
 };
