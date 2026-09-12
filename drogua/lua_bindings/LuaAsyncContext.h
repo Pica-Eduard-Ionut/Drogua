@@ -2,6 +2,7 @@
 
 #include <drogon/drogon.h>
 #include <lua.hpp>
+#include <LuaBridge/LuaBridge.h>
 
 #include <functional>
 #include <memory>
@@ -12,6 +13,8 @@
 #include "LuaRequest.h"
 #include "LuaResult.h"
 #include "LuaTransaction.h"
+#include "LuaMiddlewareManager.h"
+#include "LuaResponse.h"
 
 struct LuaAsyncContext {
     LuaCoroutineManager::Ptr coroutine;
@@ -30,4 +33,13 @@ struct LuaAsyncContext {
     std::shared_ptr<LuaTransaction> transaction;
 
     std::function<void()> resume;
+
+    // middleware
+    std::size_t middlewareIndex = 0;
+    const LuaMiddlewareManager::MiddlewareChain* middlewareChain = nullptr;
+    std::unique_ptr<LuaResponse> response;
+    bool hasRouteResponse = false;
+    // async route handler
+    luabridge::LuaRef handler;
+    LuaAsyncContext(lua_State* L) : handler(L) { }
 };

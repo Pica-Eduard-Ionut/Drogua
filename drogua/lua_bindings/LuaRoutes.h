@@ -10,6 +10,7 @@
 #include "LuaResult.h"
 #include "LuaAsyncContext.h"
 #include "LuaAsyncContextRegistry.h"
+#include "LuaMiddleware.h"
 
 #include <vector>
 #include <functional>
@@ -66,7 +67,7 @@ class LuaRoutes {
 
         // =============== Asynchronous execution =====================
         static void executeHandlerAsync(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
-        static void executeLuaFunctionAsync(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
+        static void executeLuaFunctionAsync(const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params, std::function<void(const drogon::HttpResponsePtr&)>&& callback, const LuaMiddlewareManager::MiddlewareChain* middlewareChain = nullptr);
         static void executeRouteAsync(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params, std::function<void(const drogon::HttpResponsePtr &)> &&callback);
         static void cleanupAsyncContext(const std::shared_ptr<LuaAsyncContext>& context);
         static void resumeAsyncRoute(const std::shared_ptr<LuaAsyncContext>& context, const std::function<void(lua_State*)>& pushValue);
@@ -81,6 +82,8 @@ class LuaRoutes {
 
         static drogon::HttpResponsePtr executeMiddlewareChain(const LuaMiddlewareManager::MiddlewareChain &chain, std::size_t index, LuaRequest &req, 
             LuaResponse &res, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &httpReq, const std::vector<std::string> &params);
+
+        static void pushAsyncMiddleware(const std::shared_ptr<LuaAsyncContext>& context);
 
         static int luaRegister(lua_State *L, drogon::HttpMethod method, const char *methodName);
 };

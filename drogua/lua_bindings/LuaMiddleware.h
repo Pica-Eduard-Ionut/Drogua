@@ -17,6 +17,8 @@ public:
 
     void execute(LuaRequest& req, LuaResponse& res, Next next);
 
+    void executeAsync(lua_State* L, LuaRequest& req, LuaResponse& res);
+
     const luabridge::LuaRef& function() const;
 
 private:
@@ -27,6 +29,14 @@ private:
     };
 
     static int luaNext(lua_State* L);
+    //async
+    static int luaNextAsync(lua_State* L);
+    static int nextAsyncContinuation(lua_State* L, int status, lua_KContext ctx);
+    static int downstreamContinuation(lua_State* L, int status, lua_KContext ctx);
+    static int routeContinuation(
+    lua_State* L,
+    int status,
+    lua_KContext ctx);
 
     lua_State* L_;
     luabridge::LuaRef function_;

@@ -355,4 +355,150 @@ Drogua.Routes.getAsync("/async-multiple", function(req)
     }
 end)
 
+
+local auth = Drogua.Middleware.create(function(req, res, next)
+    print("auth before")
+    next()
+    print("auth after")
+end)
+
+local logging = Drogua.Middleware.create(function(req, res, next)
+    print("logging before")
+    next()
+    print("logging after")
+end)
+
+Drogua.Routes.getAsync("/async-middleware", function(req, res)
+    print("handler")
+    return {
+        ok = true
+    }
+end, {
+    auth,
+    logging
+})
+
+local authAsyncDb = Drogua.Middleware.create(function(req, res, next)
+    print("auth before")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync("SELECT id, name FROM users WHERE id = ?", { 1 })
+
+    print("auth user:", result:toTable()[1].name)
+    next()
+    print("auth after")
+end)
+
+local loggingAsyncDb = Drogua.Middleware.create(function(req, res, next)
+    print("logging before")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync("SELECT COUNT(*) AS total FROM users")
+
+    print("logging user count:", result:toTable()[1].total)
+    next()
+    print("logging after")
+end)
+
+Drogua.Routes.getAsync("/async-middleware-db", function(req, res)
+    print("handler")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync("SELECT id, name FROM users ORDER BY id")
+
+    print("handler rows:", #result:toTable())
+
+    return {
+        success = true,
+        users = result:toTable()
+    }
+end, {
+    authAsyncDb,
+    loggingAsyncDb
+})
+
+local authAsyncError = Drogua.Middleware.create(function(req, res, next)
+    print("auth error before")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync("SELECT * FROM definitely_missing_table")
+
+    print("THIS SHOULD NOT RUN")
+    next()
+    print("THIS SHOULD NOT RUN EITHER")
+end)
+
+local loggingAsyncError = Drogua.Middleware.create(function(req, res, next)
+    print("logging before")
+    next()
+    print("logging after")
+end)
+
+Drogua.Routes.getAsync("/async-middleware-error", function(req, res)
+    print("THIS HANDLER SHOULD NOT RUN")
+
+    return {
+        success = true
+    }
+end, {
+    authAsyncError,
+    loggingAsyncError
+})
+
+
+local auth = Drogua.Middleware.create(function(req, res, next)
+    print("auth before")
+
+    res:setStatus(401)
+    res:json({
+        error = "Unauthorized"
+    })
+
+    return
+end)
+
+local logging = Drogua.Middleware.create(function(req, res, next)
+    print("logging SHOULD NOT RUN")
+    next()
+end)
+
+Drogua.Routes.getAsync("/async-middleware-short-circuit", function(req, res)
+    print("handler SHOULD NOT RUN")
+
+    return {
+        success = true
+    }
+end, {
+    auth,
+    logging
+})
+
+
+local auth123 = Drogua.Middleware.create(function(req, res, next)
+    print("auth before")
+    next()
+    print("auth after")
+end)
+
+Drogua.Routes.getAsync(
+    "/async-middleware-response",
+    function(req, res)
+        print("handler")
+
+        local response = Drogua.Response()
+
+        response:setStatus(201)
+        response:setHeader("X-Test", "async")
+        response:json({
+            success = true
+        })
+
+        return response
+    end,
+    {
+        auth123
+    }
+)
+
+
 Drogua.app():run()
