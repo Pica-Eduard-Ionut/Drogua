@@ -59,6 +59,7 @@ class LuaRoutes {
 
         // ==== Register Async Routes =====
         static int luaRegisterAsync(lua_State *L, drogon::HttpMethod method, const char *methodName);
+        static void registerAsyncRoute(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler);
 
         template <typename... Params>
         static void registerAsyncRouteImpl(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler) {

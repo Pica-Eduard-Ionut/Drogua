@@ -126,3 +126,14 @@ DROGON_TEST(LuaAsyncTransactionIntegration) {
     CHECK(runLuaFile(L, "lua/test_async_transaction.lua"));
     CHECK(runLuaFile(L, "lua/test_async_transaction_http.lua"));
 }
+
+DROGON_TEST(LuaAsyncMiddlewareIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_async_middleware.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_middleware_http.lua"));
+}
