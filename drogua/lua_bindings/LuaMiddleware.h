@@ -8,6 +8,7 @@
 class LuaRequest;
 class LuaResponse;
 class LuaMiddlewareManager;
+struct LuaAsyncContext;
 
 class LuaMiddleware {
     friend class LuaMiddlewareManager;
@@ -33,10 +34,8 @@ private:
     static int luaNextAsync(lua_State* L);
     static int nextAsyncContinuation(lua_State* L, int status, lua_KContext ctx);
     static int downstreamContinuation(lua_State* L, int status, lua_KContext ctx);
-    static int routeContinuation(
-    lua_State* L,
-    int status,
-    lua_KContext ctx);
+    static int routeContinuation(lua_State* L, int status, lua_KContext ctx);
+    static bool captureRouteResult(lua_State* L, LuaAsyncContext& context);
 
     lua_State* L_;
     luabridge::LuaRef function_;

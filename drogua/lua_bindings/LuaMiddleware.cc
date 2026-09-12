@@ -4,15 +4,13 @@
 #include "LuaResponse.h"
 #include "LuaAsyncContextRegistry.h"
 #include "LuaRoutes.h"
+#include "LuaAsyncContext.h"
 
 #include <stdexcept>
 #include <string>
 #include <utility>
-//temp 
-#include <iostream>
 
-LuaMiddleware::LuaMiddleware(lua_State* L, const luabridge::LuaRef& function)
-    : L_(L), function_(function) {
+LuaMiddleware::LuaMiddleware(lua_State* L, const luabridge::LuaRef& function) : L_(L), function_(function) {
     if (L_ == nullptr)
         throw std::runtime_error("LuaMiddleware received a null lua_State");
 
@@ -28,74 +26,46 @@ void LuaMiddleware::execute(LuaRequest& req, LuaResponse& res, Next next) {
     lua_State* L = L_;
     const int base = lua_gettop(L);
 
-    /*
-     * Push middleware function.
-     */
+    // Push middleware function
     function_.push(L);
-
-    /*
-     * Push request.
-     */
+    // Push request
     auto requestResult = luabridge::Stack<LuaRequest*>::push(L, &req);
-
     if (!requestResult) {
         lua_settop(L, base);
-
-        throw std::runtime_error(
-            "Failed to push LuaRequest: " + requestResult.message());
+        throw std::runtime_error("Failed to push LuaRequest: " + requestResult.message());
     }
 
-    /*
-     * Push response.
-     */
+    // Push response
     auto responseResult = luabridge::Stack<LuaResponse*>::push(L, &res);
-
     if (!responseResult) {
         lua_settop(L, base);
-
-        throw std::runtime_error(
-            "Failed to push LuaResponse: " + responseResult.message());
+        throw std::runtime_error("Failed to push LuaResponse: " + responseResult.message());
     }
 
-    /*
-     * Context remains alive for the entire synchronous
-     * middleware execution.
-     */
+    // Context remains alive for the entire synchronous middleware execution
     ExecutionContext context{std::move(next)};
-
     /*
      * Create:
-     *
      *     next()
-     *
      * with context as an upvalue.
      */
     lua_pushlightuserdata(L, &context);
     lua_pushcclosure(L, &LuaMiddleware::luaNext, 1);
 
-    /*
-     * Call:
-     *
-     *     middleware(req, res, next)
-     */
+    // Call: middleware(req, res, next)
     const int status = lua_pcall(L, 3, 0, 0);
 
     if (status != LUA_OK) {
         const char* error = lua_tostring(L, -1);
-
         lua_settop(L, base);
-
-        throw std::runtime_error(
-            "Lua middleware failed: " +
-            std::string(error ? error : "Unknown Lua error"));
+        throw std::runtime_error("Lua middleware failed: " + std::string(error ? error : "Unknown Lua error"));
     }
 
     lua_settop(L, base);
 }
 
 int LuaMiddleware::luaNext(lua_State* L) {
-    auto* context = static_cast<ExecutionContext*>(
-        lua_touserdata(L, lua_upvalueindex(1)));
+    auto* context = static_cast<ExecutionContext*>(lua_touserdata(L, lua_upvalueindex(1)));
 
     if (context == nullptr)
         return 0;
@@ -111,43 +81,29 @@ void LuaMiddleware::executeAsync(lua_State* L, LuaRequest& req, LuaResponse& res
         throw std::runtime_error("LuaMiddleware::executeAsync received null lua_State");
     }
 
-    /*
-     * Push middleware function.
-     */
+    // Push middleware function
     function_.push(L);
-
-    /*
-     * Push request.
-     */
+    // Push request
     auto requestResult = luabridge::Stack<LuaRequest*>::push(L, &req);
-
     if (!requestResult) {
         throw std::runtime_error("Failed to push LuaRequest for async middleware: " + requestResult.message());
     }
 
-    /*
-     * Push response.
-     */
+    // Push response
     auto responseResult = luabridge::Stack<LuaResponse*>::push(L, &res);
-
     if (!responseResult) {
         throw std::runtime_error("Failed to push LuaResponse for async middleware: " + responseResult.message());
     }
 
     /*
-     * Push async next().
-     *
-     * luaNextAsync() retrieves the async context from
-     * LuaAsyncContextRegistry.
+     * Push async next()
+     * luaNextAsync() retrieves the async context from LuaAsyncContextRegistry
      */
     lua_pushcfunction(L, &LuaMiddleware::luaNextAsync);
 }
 
 int LuaMiddleware::luaNextAsync(lua_State* L) {
-    std::cerr << "[ASYNC MW] next() called\n";
-
     auto context = LuaAsyncContextRegistry::get(L);
-
     if (!context) {
         return luaL_error(L, "Async middleware next() has no async context");
     }
@@ -156,21 +112,14 @@ int LuaMiddleware::luaNextAsync(lua_State* L) {
         return luaL_error(L, "Async middleware next() has no middleware chain");
     }
 
-    std::cerr << "[ASYNC MW] next() yielding at middlewareIndex=" << context->middlewareIndex << '\n';
-
     lua_pushboolean(L, 1);
-
     return lua_yieldk(L, 1, 0, &LuaMiddleware::nextAsyncContinuation);
 }
 
 int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext ctx) {
-    std::cerr << "[ASYNC MW] continuation entered, status=" << status << '\n';
-
-    if (!L)
-        return 0;
+    if (!L) return 0;
 
     auto context = LuaAsyncContextRegistry::get(L);
-
     if (!context) {
         return luaL_error(L, "Async middleware continuation has no async context");
     }
@@ -184,38 +133,30 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
     }
 
     ++context->middlewareIndex;
-
-    std::cerr << "[ASYNC MW] advanced to middlewareIndex=" << context->middlewareIndex << '\n';
-
-    // Downstream middleware.
+    // Continue through the middleware chain.
     if (context->middlewareIndex < context->middlewareChain->size()) {
         LuaMiddleware* middleware = (*context->middlewareChain)[context->middlewareIndex];
-
         if (!middleware) {
             return luaL_error(L, "Async middleware chain contains a null middleware");
         }
 
-        std::cerr << "[ASYNC MW] executing downstream middleware index=" << context->middlewareIndex << '\n';
-
         middleware->executeAsync(L, *context->request, *context->response);
 
-        std::cerr << "[ASYNC MW] calling downstream middleware\n";
-
-        // If downstream middleware yields, downstreamContinuation() handles the resume.
+        /*
+         * Actually invoke the downstream middleware.
+         *
+         * If it calls next(), the coroutine yields and the middleware chain continues through
+         * nextAsyncContinuation(). When the downstream middleware chain eventually finishes,
+         * downstreamContinuation() returns control to this middleware layer.
+         */
         lua_callk(L, 3, 0, ctx, &LuaMiddleware::downstreamContinuation);
-
-        std::cerr << "[ASYNC MW] downstream middleware returned synchronously\n";
 
         return 0;
     }
 
-    // No middleware remains. Execute the actual route handler.
-    std::cerr << "[ASYNC MW] no middleware remains, executing route handler\n";
-
+    // No middleware remains -> execute the route handler.
     LuaCoroutineManager::pushFunction(context->coroutine, context->handler);
-
     auto requestResult = luabridge::Stack<LuaRequest*>::push(L, context->request.get());
-
     if (!requestResult) {
         return luaL_error(L, "Failed to push LuaRequest: %s", requestResult.message().c_str());
     }
@@ -226,72 +167,28 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
 
     const int argumentCount = 1 + static_cast<int>(context->params.size());
 
-    std::cerr << "[ASYNC MW] calling route handler with " << argumentCount << " args\n";
-
-    // The route handler returns one Lua value. If it yields, routeContinuation() receives the final result.
+    /*
+     * Route returns one value.
+     * If the route yields, routeContinuation() will handle the result when the coroutine resumes.
+     */
     lua_callk(L, argumentCount, 1, ctx, &LuaMiddleware::routeContinuation);
 
-    // Normal synchronous return from route handler.
+    // Route returned synchronously.
     if (lua_gettop(L) < 1) {
         return luaL_error(L, "Async route handler did not return a result");
     }
 
-    std::cerr << "[ASYNC MW] route handler returned synchronously\n";
-    std::cerr << "[ASYNC MW] route result type=" << luaL_typename(L, -1) << '\n';
-
-    auto result = luabridge::Stack<luabridge::LuaRef>::get(L, -1);
-
-    if (!result) {
-        return luaL_error(L, "Failed to retrieve async route result: %s", result.message().c_str());
+    if (!captureRouteResult(L, *context)) {
+        return luaL_error(L, "Async route handler must return a table or Drogua.Response");
     }
 
-    auto luaResult = result.value();
-
-    if (luaResult.isUserdata()) {
-        auto response = luabridge::get<LuaResponse*>(L, -1);
-
-        if (response) {
-            context->response = std::make_unique<LuaResponse>(response.value()->response());
-            context->hasRouteResponse = true;
-
-            lua_pop(L, 1);
-
-            std::cerr << "[ASYNC MW] captured Drogua.Response\n";
-
-            return 0;
-        }
-    }
-
-    if (luaResult.isTable()) {
-        try {
-            Json::Value json = LuaRoutes::luaTableToJson(luaResult);
-            auto httpResponse = drogon::HttpResponse::newHttpJsonResponse(json);
-
-            context->response = std::make_unique<LuaResponse>(httpResponse);
-            context->hasRouteResponse = true;
-
-            lua_pop(L, 1);
-
-            std::cerr << "[ASYNC MW] captured table response\n";
-
-            return 0;
-        }
-        catch (const std::exception& e) {
-            return luaL_error(L, "Failed to convert async route result to JSON: %s", e.what());
-        }
-    }
-
-    return luaL_error(L, "Async route handler must return a table or Drogua.Response");
+    return 0;
 }
 
 int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx) {
-    std::cerr << "[ASYNC MW] route continuation, status=" << status << '\n';
-
-    if (!L)
-        return 0;
+    if (!L) return 0;
 
     auto context = LuaAsyncContextRegistry::get(L);
-
     if (!context) {
         return luaL_error(L, "Async route continuation has no async context");
     }
@@ -304,72 +201,75 @@ int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx)
         return luaL_error(L, "Async route handler did not return a result");
     }
 
-    std::cerr << "[ASYNC MW] route continuation result type=" << luaL_typename(L, -1) << '\n';
-
-    auto result = luabridge::Stack<luabridge::LuaRef>::get(L, -1);
-
-    if (!result) {
-        return luaL_error(L, "Failed to retrieve async route result: %s", result.message().c_str());
+    /*
+     * The yielded route has now returned its final value.
+     * Use the same result handling as the synchronous route path in nextAsyncContinuation().
+     */
+    if (!captureRouteResult(L, *context)) {
+        return luaL_error(L, "Async route handler must return a table or Drogua.Response");
     }
 
-    auto luaResult = result.value();
-
-    if (luaResult.isUserdata()) {
-        auto response = luabridge::get<LuaResponse*>(L, -1);
-
-        if (response) {
-            context->response = std::make_unique<LuaResponse>(response.value()->response());
-            context->hasRouteResponse = true;
-
-            lua_pop(L, 1);
-
-            std::cerr << "[ASYNC MW] captured Drogua.Response after yield\n";
-
-            return 0;
-        }
-    }
-
-    if (luaResult.isTable()) {
-        try {
-            Json::Value json = LuaRoutes::luaTableToJson(luaResult);
-            auto httpResponse = drogon::HttpResponse::newHttpJsonResponse(json);
-
-            context->response = std::make_unique<LuaResponse>(httpResponse);
-            context->hasRouteResponse = true;
-
-            lua_pop(L, 1);
-
-            std::cerr << "[ASYNC MW] captured table response after yield\n";
-
-            return 0;
-        }
-        catch (const std::exception& e) {
-            return luaL_error(L, "Failed to convert async route result to JSON: %s", e.what());
-        }
-    }
-
-    return luaL_error(L, "Async route handler must return a table or Drogua.Response");
+    return 0;
 }
 
 int LuaMiddleware::downstreamContinuation(lua_State* L, int status, lua_KContext ctx) {
-    std::cerr << "[ASYNC MW] downstream continuation, status=" << status << '\n';
-
     if (!L)
         return 0;
 
     auto context = LuaAsyncContextRegistry::get(L);
-
     if (!context) {
         return luaL_error(L, "Async middleware downstream continuation has no async context");
     }
 
-    if (status != LUA_YIELD) {
-        return luaL_error(L, "Unexpected downstream continuation status: %d", status);
+    /*
+     * The downstream middleware has finished.
+     * We deliberately do not advance middlewareIndex here. nextAsyncContinuation() already
+     * advanced it before entering the downstream middleware.
+     *
+     * Returning 0 resumes the middleware that originally called next(), giving us the onion-style unwind:
+     *     MW1 -> MW2 -> MW3 -> route
+     *        <- MW1  <- MW2  <- MW3
+     */
+    if (status != LUA_YIELD && status != LUA_OK) {
+        return luaL_error(L, "Unexpected downstream middleware continuation status: %d", status);
     }
 
-    std::cerr << "[ASYNC MW] downstream resumed after yield\n";
-
-    // The route result is already stored in context->response. Return zero values so the middleware resumes after next().
     return 0;
 }
 
+bool LuaMiddleware::captureRouteResult(lua_State* L, LuaAsyncContext& context) {
+    auto result = luabridge::Stack<luabridge::LuaRef>::get(L, -1);
+
+    if (!result)
+        return false;
+
+    auto luaResult = result.value();
+    // Drogua.Response
+    if (luaResult.isUserdata()) {
+        auto response = luabridge::get<LuaResponse*>(L, -1);
+
+        if (response) {
+            context.response = std::make_unique<LuaResponse>(response.value()->response());
+            context.hasRouteResponse = true;
+            lua_pop(L, 1);
+            return true;
+        }
+    }
+
+    // Lua table -> JSON response
+    if (luaResult.isTable()) {
+        try {
+            Json::Value json = LuaRoutes::luaTableToJson(luaResult);
+            auto httpResponse = drogon::HttpResponse::newHttpJsonResponse(json);
+            context.response = std::make_unique<LuaResponse>(httpResponse);
+            context.hasRouteResponse = true;
+            lua_pop(L, 1);
+            return true;
+        }
+        catch (const std::exception&) {
+            return false;
+        }
+    }
+
+    return false;
+}
