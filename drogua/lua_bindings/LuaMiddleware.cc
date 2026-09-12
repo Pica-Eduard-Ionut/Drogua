@@ -103,7 +103,7 @@ void LuaMiddleware::executeAsync(lua_State* L, LuaRequest& req, LuaResponse& res
 }
 
 int LuaMiddleware::luaNextAsync(lua_State* L) {
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
     if (!context) {
         return luaL_error(L, "Async middleware next() has no async context");
     }
@@ -119,7 +119,7 @@ int LuaMiddleware::luaNextAsync(lua_State* L) {
 int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext ctx) {
     if (!L) return 0;
 
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
     if (!context) {
         return luaL_error(L, "Async middleware continuation has no async context");
     }
@@ -188,7 +188,7 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
 int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx) {
     if (!L) return 0;
 
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
     if (!context) {
         return luaL_error(L, "Async route continuation has no async context");
     }
@@ -216,7 +216,7 @@ int LuaMiddleware::downstreamContinuation(lua_State* L, int status, lua_KContext
     if (!L)
         return 0;
 
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
     if (!context) {
         return luaL_error(L, "Async middleware downstream continuation has no async context");
     }

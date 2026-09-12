@@ -1,6 +1,7 @@
 #include "LuaTransaction.h"
 #include "LuaResult.h"
 #include "LuaAsyncContextRegistry.h"
+#include "LuaAsyncContext.h"
 
 #include <drogon/drogon.h>
 
@@ -283,7 +284,7 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
         return luaL_error(L, "Transaction queryAsync expects sql and optional parameters");
     }
 
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
 
     if (!context) {
         return luaL_error(L, "Transaction queryAsync must be called from an async route");
@@ -362,7 +363,7 @@ int LuaTransaction::queryAsyncContinuation(lua_State* L, int status, lua_KContex
         return 0;
     }
 
-    auto context = LuaAsyncContextRegistry::get(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
 
     if (!context) {
         return luaL_error(L, "Transaction queryAsync continuation has no async context");

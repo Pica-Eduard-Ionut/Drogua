@@ -43,3 +43,11 @@ struct LuaAsyncContext {
     luabridge::LuaRef handler;
     LuaAsyncContext(lua_State* L) : handler(L) { }
 };
+
+struct LuaAsyncDatabaseContext {
+    LuaCoroutineManager::Ptr coroutine;
+    std::function<void()> resume;
+    std::function<void(const drogon::HttpResponsePtr&)> callback;
+    std::shared_ptr<LuaResult> asyncResult;
+    std::string asyncError;
+};
