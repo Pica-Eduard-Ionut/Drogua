@@ -83,7 +83,7 @@ class LuaRoutes {
         static drogon::HttpResponsePtr executeMiddlewareChain(const LuaMiddlewareManager::MiddlewareChain &chain, std::size_t index, LuaRequest &req, 
             LuaResponse &res, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &httpReq, const std::vector<std::string> &params);
 
-        static void pushAsyncMiddleware(const std::shared_ptr<LuaAsyncContext>& context);
+        static void pushAsyncMiddleware(const std::shared_ptr<LuaAsyncMiddlewareContext>& context);
 
         static int luaRegister(lua_State *L, drogon::HttpMethod method, const char *methodName);
 };

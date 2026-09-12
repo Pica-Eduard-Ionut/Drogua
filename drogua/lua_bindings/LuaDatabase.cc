@@ -208,11 +208,9 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
 
     // Create the specialized database context.
     auto context = std::make_shared<LuaAsyncDatabaseContext>();
-
     context->coroutine = routeContext->coroutine;
     context->callback = routeContext->callback;
     context->resume = routeContext->resume;
-
     // Register the database context separately from the route context.
     LuaAsyncContextRegistry::set<LuaAsyncDatabaseContext>(L, context);
 
@@ -231,7 +229,6 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
             }
 
             auto params = paramsResult.value();
-
             db->queryAsync(sql, params, [context](std::shared_ptr<LuaResult> result) {
                 context->asyncResult = std::move(result);
                 context->asyncError.clear();
@@ -359,6 +356,7 @@ void LuaDatabase::beginAsync(std::function<void(std::shared_ptr<LuaTransaction>)
             callback(std::make_shared<LuaTransaction>(transaction));
         });
     }
+
     catch (const std::exception& e) {
         errorCallback(e.what());
     }
@@ -374,20 +372,17 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
     }
 
     auto database = luabridge::get<LuaDatabase*>(L, 1);
-
     if (!database) {
         return luaL_error(L, "Invalid DatabaseClient: %s", database.message().c_str());
     }
 
     LuaDatabase* db = database.value();
-
     if (!db) {
         return luaL_error(L, "DatabaseClient is null");
     }
 
     // beginAsync is started from the route context.
     auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
-
     if (!routeContext) {
         return luaL_error(L, "Database beginAsync must be called from an async route");
     }
@@ -398,11 +393,9 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
 
     // Create the transaction context.
     auto transactionContext = std::make_shared<LuaAsyncTransactionContext>();
-
     transactionContext->coroutine = routeContext->coroutine;
     transactionContext->callback = routeContext->callback;
     transactionContext->resume = routeContext->resume;
-
     // Register the transaction context.
     LuaAsyncContextRegistry::set<LuaAsyncTransactionContext>(L, transactionContext);
 
@@ -423,6 +416,7 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
             }
         });
     }
+
     catch (const std::exception& e) {
         LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
         return luaL_error(L, "Async transaction begin failed: %s", e.what());
@@ -439,7 +433,6 @@ int LuaDatabase::beginAsyncContinuation(lua_State* L, int status, lua_KContext c
     }
 
     auto context = LuaAsyncContextRegistry::get<LuaAsyncTransactionContext>(L);
-
     if (!context) {
         return luaL_error(L, "Database beginAsync continuation has no transaction async context");
     }
@@ -469,9 +462,7 @@ int LuaDatabase::beginAsyncContinuation(lua_State* L, int status, lua_KContext c
      * The temporary async transaction context is no longer needed for beginAsync().
      */
     LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
-
     auto pushResult = luabridge::Stack<std::shared_ptr<LuaTransaction>>::push(L, transaction);
-
     if (!pushResult) {
         return luaL_error(L, "Failed to push async transaction: %s", pushResult.message().c_str());
     }

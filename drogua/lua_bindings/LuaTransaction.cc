@@ -104,13 +104,11 @@ std::shared_ptr<LuaResult> LuaTransaction::query(const std::string& sql) {
     }
 
     catch (const drogon::orm::DrogonDbException& e) {
-        throw std::runtime_error(
-            "Transaction database error: " + std::string(e.base().what()));
+        throw std::runtime_error("Transaction database error: " + std::string(e.base().what()));
     }
 
     catch (const std::exception& e) {
-        throw std::runtime_error(
-            "Transaction database error: " + std::string(e.what()));
+        throw std::runtime_error("Transaction database error: " + std::string(e.what()));
     }
 }
 
@@ -139,13 +137,11 @@ std::shared_ptr<LuaResult> LuaTransaction::query(const std::string& sql, const l
 
 
     catch (const drogon::orm::DrogonDbException& e) {
-        throw std::runtime_error(
-            "Transaction database error: " + std::string(e.base().what()));
+        throw std::runtime_error("Transaction database error: " + std::string(e.base().what()));
     }
 
     catch (const std::exception& e) {
-        throw std::runtime_error(
-            "Transaction database error: " + std::string(e.what()));
+        throw std::runtime_error("Transaction database error: " + std::string(e.what()));
     }
 }
 
@@ -242,7 +238,6 @@ void LuaTransaction::queryAsync(const std::string& sql, const luabridge::LuaRef&
     }
 
     auto binder = (*transaction_) << sql;
-
     bindLuaParameters(binder, params);
 
     binder >> [callback](const drogon::orm::Result& result) {
@@ -293,7 +288,6 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
 
     // Create the specialized transaction async context.
     auto context = std::make_shared<LuaAsyncTransactionContext>();
-
     context->coroutine = routeContext->coroutine;
     context->callback = routeContext->callback;
     context->resume = routeContext->resume;
@@ -308,14 +302,12 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
             }
 
             auto paramsResult = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
-
             if (!paramsResult) {
                 LuaAsyncContextRegistry::clear<LuaAsyncTransactionContext>(L);
                 return luaL_error(L, "Invalid query parameters: %s", paramsResult.message().c_str());
             }
 
             auto params = paramsResult.value();
-
             tx->queryAsync(sql, params, [context](std::shared_ptr<LuaResult> result) {
                 context->asyncResult = std::move(result);
                 context->asyncError.clear();

@@ -81,31 +81,25 @@ void LuaMiddleware::executeAsync(lua_State* L, LuaRequest& req, LuaResponse& res
         throw std::runtime_error("LuaMiddleware::executeAsync received null lua_State");
     }
 
-    // Push middleware function
     function_.push(L);
-    // Push request
+
     auto requestResult = luabridge::Stack<LuaRequest*>::push(L, &req);
     if (!requestResult) {
         throw std::runtime_error("Failed to push LuaRequest for async middleware: " + requestResult.message());
     }
 
-    // Push response
     auto responseResult = luabridge::Stack<LuaResponse*>::push(L, &res);
     if (!responseResult) {
         throw std::runtime_error("Failed to push LuaResponse for async middleware: " + responseResult.message());
     }
 
-    /*
-     * Push async next()
-     * luaNextAsync() retrieves the async context from LuaAsyncContextRegistry
-     */
     lua_pushcfunction(L, &LuaMiddleware::luaNextAsync);
 }
 
 int LuaMiddleware::luaNextAsync(lua_State* L) {
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncMiddlewareContext>(L);
     if (!context) {
-        return luaL_error(L, "Async middleware next() has no async context");
+        return luaL_error(L, "Async middleware next() has no async middleware context");
     }
 
     if (!context->middlewareChain) {
@@ -117,11 +111,14 @@ int LuaMiddleware::luaNextAsync(lua_State* L) {
 }
 
 int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext ctx) {
-    if (!L) return 0;
+    (void)ctx;
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    if (!L)
+        return 0;
+
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncMiddlewareContext>(L);
     if (!context) {
-        return luaL_error(L, "Async middleware continuation has no async context");
+        return luaL_error(L, "Async middleware continuation has no async middleware context");
     }
 
     if (!context->middlewareChain) {
@@ -133,7 +130,7 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
     }
 
     ++context->middlewareIndex;
-    // Continue through the middleware chain.
+    // Continue through middleware chain.
     if (context->middlewareIndex < context->middlewareChain->size()) {
         LuaMiddleware* middleware = (*context->middlewareChain)[context->middlewareIndex];
         if (!middleware) {
@@ -141,21 +138,14 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
         }
 
         middleware->executeAsync(L, *context->request, *context->response);
-
-        /*
-         * Actually invoke the downstream middleware.
-         *
-         * If it calls next(), the coroutine yields and the middleware chain continues through
-         * nextAsyncContinuation(). When the downstream middleware chain eventually finishes,
-         * downstreamContinuation() returns control to this middleware layer.
-         */
         lua_callk(L, 3, 0, ctx, &LuaMiddleware::downstreamContinuation);
 
         return 0;
     }
 
-    // No middleware remains -> execute the route handler.
+    // No middleware remains -> execute route handler.
     LuaCoroutineManager::pushFunction(context->coroutine, context->handler);
+
     auto requestResult = luabridge::Stack<LuaRequest*>::push(L, context->request.get());
     if (!requestResult) {
         return luaL_error(L, "Failed to push LuaRequest: %s", requestResult.message().c_str());
@@ -166,11 +156,6 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
     }
 
     const int argumentCount = 1 + static_cast<int>(context->params.size());
-
-    /*
-     * Route returns one value.
-     * If the route yields, routeContinuation() will handle the result when the coroutine resumes.
-     */
     lua_callk(L, argumentCount, 1, ctx, &LuaMiddleware::routeContinuation);
 
     // Route returned synchronously.
@@ -186,11 +171,14 @@ int LuaMiddleware::nextAsyncContinuation(lua_State* L, int status, lua_KContext 
 }
 
 int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx) {
-    if (!L) return 0;
+    (void)ctx;
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    if (!L)
+        return 0;
+
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncMiddlewareContext>(L);
     if (!context) {
-        return luaL_error(L, "Async route continuation has no async context");
+        return luaL_error(L, "Async route continuation has no async middleware context");
     }
 
     if (status != LUA_YIELD) {
@@ -201,10 +189,6 @@ int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx)
         return luaL_error(L, "Async route handler did not return a result");
     }
 
-    /*
-     * The yielded route has now returned its final value.
-     * Use the same result handling as the synchronous route path in nextAsyncContinuation().
-     */
     if (!captureRouteResult(L, *context)) {
         return luaL_error(L, "Async route handler must return a table or Drogua.Response");
     }
@@ -213,23 +197,16 @@ int LuaMiddleware::routeContinuation(lua_State* L, int status, lua_KContext ctx)
 }
 
 int LuaMiddleware::downstreamContinuation(lua_State* L, int status, lua_KContext ctx) {
+    (void)ctx;
+
     if (!L)
         return 0;
 
-    auto context = LuaAsyncContextRegistry::get<LuaAsyncContext>(L);
+    auto context = LuaAsyncContextRegistry::get<LuaAsyncMiddlewareContext>(L);
     if (!context) {
-        return luaL_error(L, "Async middleware downstream continuation has no async context");
+        return luaL_error(L, "Async middleware downstream continuation has no async middleware context");
     }
 
-    /*
-     * The downstream middleware has finished.
-     * We deliberately do not advance middlewareIndex here. nextAsyncContinuation() already
-     * advanced it before entering the downstream middleware.
-     *
-     * Returning 0 resumes the middleware that originally called next(), giving us the onion-style unwind:
-     *     MW1 -> MW2 -> MW3 -> route
-     *        <- MW1  <- MW2  <- MW3
-     */
     if (status != LUA_YIELD && status != LUA_OK) {
         return luaL_error(L, "Unexpected downstream middleware continuation status: %d", status);
     }
@@ -237,7 +214,7 @@ int LuaMiddleware::downstreamContinuation(lua_State* L, int status, lua_KContext
     return 0;
 }
 
-bool LuaMiddleware::captureRouteResult(lua_State* L, LuaAsyncContext& context) {
+bool LuaMiddleware::captureRouteResult(lua_State* L, LuaAsyncMiddlewareContext& context) {
     auto result = luabridge::Stack<luabridge::LuaRef>::get(L, -1);
 
     if (!result)

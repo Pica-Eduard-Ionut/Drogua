@@ -18,24 +18,13 @@
 
 struct LuaAsyncContext {
     LuaCoroutineManager::Ptr coroutine;
-
     std::unique_ptr<LuaRequest> request;
-    drogon::HttpRequestPtr httpRequest;
-
-    std::vector<std::string> params;
-
     std::function<void(const drogon::HttpResponsePtr&)> callback;
 
     std::function<void()> resume;
-
-    // middleware
-    std::size_t middlewareIndex = 0;
-    const LuaMiddlewareManager::MiddlewareChain* middlewareChain = nullptr;
-    std::unique_ptr<LuaResponse> response;
-    bool hasRouteResponse = false;
-
     // async route handler
     luabridge::LuaRef handler;
+    std::vector<std::string> params;
 
     LuaAsyncContext(lua_State* L)
         : handler(L) {
@@ -60,4 +49,24 @@ struct LuaAsyncTransactionContext {
     std::string asyncError;
 
     std::shared_ptr<LuaTransaction> transaction;
+};
+
+struct LuaAsyncMiddlewareContext {
+    LuaCoroutineManager::Ptr coroutine;
+    std::function<void()> resume;
+    std::function<void(const drogon::HttpResponsePtr&)> callback;
+
+    std::unique_ptr<LuaRequest> request;
+    std::unique_ptr<LuaResponse> response;
+    bool hasRouteResponse = false;
+
+    std::size_t middlewareIndex = 0;
+    const LuaMiddlewareManager::MiddlewareChain* middlewareChain = nullptr;
+
+    luabridge::LuaRef handler;
+    std::vector<std::string> params;
+
+    LuaAsyncMiddlewareContext(lua_State* L)
+        : handler(L) {
+    }
 };
