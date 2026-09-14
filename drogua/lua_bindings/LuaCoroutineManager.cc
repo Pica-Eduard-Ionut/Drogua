@@ -6,12 +6,18 @@ LuaCoroutineManager::Coroutine::~Coroutine() {
     if (owner != nullptr &&
         registryRef != LUA_NOREF &&
         registryRef != LUA_REFNIL) {
+
         luaL_unref(owner, LUA_REGISTRYINDEX, registryRef);
+
         registryRef = LUA_NOREF;
     }
+
+    owner = nullptr;
+    thread = nullptr;
 }
 
-LuaCoroutineManager::Ptr LuaCoroutineManager::create(lua_State *L) {
+LuaCoroutineManager::Ptr LuaCoroutineManager::create(lua_State *L)
+{
     if (L == nullptr) {
         throw std::invalid_argument("LuaCoroutineManager::create: null lua_State");
     }
@@ -19,22 +25,12 @@ LuaCoroutineManager::Ptr LuaCoroutineManager::create(lua_State *L) {
     auto coroutine = std::make_shared<Coroutine>();
     coroutine->owner = L;
 
-    /*
-     * lua_newthread() creates a coroutine and pushes
-     * the thread object onto L's stack.
-     */
     coroutine->thread = lua_newthread(L);
 
     if (coroutine->thread == nullptr) {
         throw std::runtime_error("Failed to create Lua coroutine");
     }
 
-    /*
-     * Keep the coroutine alive.
-     *
-     * luaL_ref() pops the thread from L's stack and stores
-     * a reference to it in the registry.
-     */
     coroutine->registryRef = luaL_ref(L, LUA_REGISTRYINDEX);
 
     return coroutine;
@@ -120,8 +116,9 @@ std::string LuaCoroutineManager::getError(lua_State *L) {
     return "Unknown Lua error";
 }
 
-void LuaCoroutineManager::clearStack(lua_State *L) {
-    if (L != nullptr) {
-        lua_settop(L, 0);
-    }
+void LuaCoroutineManager::clearStack(lua_State* L) {
+    if (!L)
+        return;
+
+    lua_settop(L, 0);
 }

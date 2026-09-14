@@ -1,6 +1,7 @@
 #include <lua.hpp>
 
 #include "lua_bindings/LuaBindings.h"
+#include "lua_bindings/LuaMiddlewareManager.h"
 
 #include <iostream>
 
@@ -17,9 +18,14 @@ int main() {
     if (luaL_dofile(L, "app.lua") != LUA_OK) {
         std::cerr << "Lua error: " << lua_tostring(L, -1) << '\n';
         lua_pop(L, 1);
+
+        LuaMiddlewareManager::instance().clear();
+
         lua_close(L);
         return 1;
     }
+
+    LuaMiddlewareManager::instance().clear();
 
     lua_close(L);
     return 0;

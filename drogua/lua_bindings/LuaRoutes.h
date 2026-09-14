@@ -104,6 +104,5 @@ class LuaRoutes {
 
         static int luaRegister(lua_State *L, drogon::HttpMethod method, const char *methodName);
 
-        
-
+        static void cleanupAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& context, const std::shared_ptr<LuaAsyncMiddlewareContext>& middlewareContext);
 };
