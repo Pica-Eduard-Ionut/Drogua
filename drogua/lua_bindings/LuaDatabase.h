@@ -53,4 +53,5 @@ class LuaDatabase {
     private:
         std::string name_;
         drogon::orm::DbClientPtr client_;
+        static void clearAsyncDatabaseContext(lua_State* L, const std::shared_ptr<LuaAsyncDatabaseContext>& context);
 };

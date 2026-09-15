@@ -19,6 +19,7 @@
 struct LuaAsyncContext {
     LuaCoroutineManager::Ptr coroutine;
     std::function<void()> resume;
+    trantor::EventLoop* ownerLoop = nullptr;
     std::function<void(const drogon::HttpResponsePtr&)> callback;
 };
 

@@ -502,6 +502,8 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
     context->callback = std::move(callback);
 
     context->coroutine = LuaCoroutineManager::create(L);
+    context->ownerLoop = trantor::EventLoop::getEventLoopOfCurrentThread();
+
     if (!context->coroutine) throw std::runtime_error("Failed to create Lua async coroutine");
 
     lua_State* co = LuaCoroutineManager::state(context->coroutine);
@@ -535,15 +537,18 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         if (!context || !context->coroutine) return;
 
         auto middlewareContext = weakMiddlewareContext.lock();
+        auto* ownerLoop = context->ownerLoop;
+        if (!ownerLoop) {
+            LOG_ERROR << "Lua async coroutine has no owner loop";
+            return;
+        }
 
-        app().getLoop()->queueInLoop([context, middlewareContext]() {
+        ownerLoop->queueInLoop([context, middlewareContext]() {
             if (!context || !context->coroutine) return;
-
             lua_State* co = LuaCoroutineManager::state(context->coroutine);
             if (!co) return;
 
             lua_pushboolean(co, 1);
-
             auto resumeResult = LuaCoroutineManager::resume(context->coroutine, 1);
 
             if (resumeResult.status == LuaCoroutineManager::Status::Error) {
@@ -551,7 +556,6 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
                 std::string error = "Lua async route handler failed: " + resumeResult.error;
 
                 LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
                 if (callback) LuaRoutes::sendErrorResponse(error, std::move(callback));
                 return;
             }
