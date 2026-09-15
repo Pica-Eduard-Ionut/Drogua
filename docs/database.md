@@ -2,6 +2,8 @@
 
 Drogua uses Drogon's database clients. Database connections are configured in `config.json` and accessed from Lua through `Drogua.Database`.
 
+Drogua supports both **synchronous and asynchronous** database operations.
+
 ## Configuration
 
 Database clients are configured under `db_clients` in the Drogon configuration file.
@@ -39,7 +41,6 @@ local db = Drogua.Database.get("default")
 local db = Drogua.Database.get("default")
 
 assert(db:valid())
-
 print(db:name())
 ```
 
@@ -49,17 +50,19 @@ If the requested database client does not exist, an error is raised.
 
 ### DatabaseClient API
 
-| Method                 | Description                                     |
-| ---------------------- | ----------------------------------------------- |
-| `name()`               | Returns the configured database name            |
-| `valid()`              | Returns whether the database client is valid    |
-| `exec(sql)`            | Executes SQL and returns a `DatabaseResult`     |
-| `query(sql, params)`   | Executes SQL, optionally with parameters        |
-| `executeAffected(sql)` | Executes SQL and returns the affected row count |
-| `lastInsertId(sql)`    | Executes SQL and returns the last insert ID     |
-| `begin()`              | Starts a database transaction                   |
+| Method                    | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `name()`                  | Returns the configured database name            |
+| `valid()`                 | Returns whether the database client is valid    |
+| `exec(sql)`               | Executes SQL and returns a `DatabaseResult`     |
+| `query(sql, params)`      | Executes SQL, optionally with parameters        |
+| `executeAffected(sql)`    | Executes SQL and returns the affected row count |
+| `lastInsertId(sql)`       | Executes SQL and returns the last insert ID     |
+| `begin()`                 | Starts a synchronous database transaction       |
+| `queryAsync(sql, params)` | Executes a query asynchronously                 |
+| `beginAsync()`            | Starts an asynchronous database transaction     |
 
-Drogua database operations are currently **synchronous**.
+The `Async` methods are intended to be used from Drogua's asynchronous routes and middleware.
 
 ---
 
@@ -77,6 +80,35 @@ local result = db:exec([[
 
 print(result:affectedRows())
 print(result:insertId())
+```
+
+For asynchronous queries, use `queryAsync()`:
+
+```lua
+local db = Drogua.Database.get("default")
+
+local result = db:queryAsync([[
+    INSERT INTO users (name)
+    VALUES ('Alice')
+]])
+
+print(result:affectedRows())
+```
+
+Async database operations can be used from an async route:
+
+```lua
+Routes.getAsync("/users", function(req)
+    local db = Drogua.Database.get("default")
+
+    local result = db:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    return result:toTable()
+end)
 ```
 
 ---
@@ -104,13 +136,25 @@ for i = 0, users:count() - 1 do
 end
 ```
 
+The asynchronous equivalent is `queryAsync()`:
+
+```lua
+local users = db:queryAsync([[
+    SELECT id, name
+    FROM users
+    ORDER BY id
+]])
+```
+
 See [Database Result](database-result.md) and [Database Row](database-row.md) for working with query results.
 
 ---
 
 ## Parameterized Queries
 
-`query()` accepts an optional Lua table containing parameters for `?` placeholders.
+Both `query()` and `queryAsync()` accept an optional Lua table containing parameters for `?` placeholders.
+
+Synchronous:
 
 ```lua
 local db = Drogua.Database.get("default")
@@ -124,10 +168,22 @@ local users = db:query([[
 })
 ```
 
+Asynchronous:
+
+```lua
+local users = db:queryAsync([[
+    SELECT id, name
+    FROM users
+    WHERE name = ?
+]], {
+    "Alice"
+})
+```
+
 Multiple parameters are passed in the same order as the placeholders:
 
 ```lua
-local result = db:query([[
+local result = db:queryAsync([[
     SELECT id, name
     FROM users
     WHERE name = ? AND id = ?
@@ -163,35 +219,51 @@ local id = db:lastInsertId([[
 print(id)
 ```
 
+These operations are currently available through the synchronous database API.
+
 ---
 
 ## Transactions
 
-Transactions are created with `begin()`:
+Synchronous transactions are created with `begin()`:
 
 ```lua
 local db = Drogua.Database.get("default")
-
 local tx = db:begin()
 
 tx:query([[
     INSERT INTO users (name)
     VALUES (?)
-]], {
-    "Alice"
-})
+]], { "Alice" })
 
 tx:query([[
     INSERT INTO users (name)
     VALUES (?)
-]], {
-    "Bob"
-})
+]], { "Bob" })
 
 tx:commit()
 ```
 
-Transactions support parameterized queries and multiple operations before committing or rolling back.
+Asynchronous transactions are created with `beginAsync()`:
+
+```lua
+local db = Drogua.Database.get("default")
+local tx = db:beginAsync()
+
+tx:queryAsync([[
+    INSERT INTO users (name)
+    VALUES (?)
+]], { "Alice" })
+
+tx:queryAsync([[
+    INSERT INTO users (name)
+    VALUES (?)
+]], { "Bob" })
+
+tx:commit()
+```
+
+Async transactions use `queryAsync()` for database operations. Transactions can be committed with `commit()` or cancelled with `rollback()`.
 
 See [Database Transactions](database-transaction.md).
 
@@ -205,7 +277,6 @@ For example, a Lua database library can be used normally:
 
 ```lua
 local sqlite3 = require("lsqlite3")
-
 local db = sqlite3.open("./test.db")
 ```
 
@@ -213,11 +284,13 @@ However, Lua database modules will **not have the same performance characteristi
 
 Drogua's database API is integrated directly with Drogon and is the recommended option for application database access.
 
-Lua database modules are guaranteed to work correctly with Drogua's **synchronous routes**, since the current Drogua request execution model is synchronous.
+For asynchronous routes, use Drogua's native asynchronous database API such as `queryAsync()` and `beginAsync()`.
 
 ---
 
 ## Complete Example
+
+A synchronous route can use the synchronous database API:
 
 ```lua
 local Database = Drogua.Database
@@ -227,6 +300,22 @@ Routes.get("/users", function(req)
     local db = Database.get("default")
 
     local users = db:query([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    return users:toTable()
+end)
+```
+
+An asynchronous route uses the corresponding async API:
+
+```lua
+Routes.getAsync("/users", function(req)
+    local db = Database.get("default")
+
+    local users = db:queryAsync([[
         SELECT id, name
         FROM users
         ORDER BY id

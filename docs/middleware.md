@@ -14,6 +14,8 @@ function(req, res, next)
 * `res` — the current `Drogua.Response`
 * `next` — a function that continues execution to the next middleware or the route handler
 
+Middleware works with both synchronous and asynchronous routes.
+
 ## Creating Middleware
 
 ```lua
@@ -21,7 +23,6 @@ local Middleware = Drogua.Middleware
 
 local authMiddleware = Middleware.create(function(req, res, next)
     -- middleware logic
-
     next()
 end)
 ```
@@ -58,6 +59,16 @@ In this example, the response will contain:
 X-Middleware: true
 ```
 
+The same middleware can be attached to an asynchronous route:
+
+```lua
+Routes.getAsync("/example", function(req)
+    return {
+        message = "Hello"
+    }
+end, { middleware })
+```
+
 ## Request and Response Access
 
 Middleware has access to both the request and response objects.
@@ -83,9 +94,7 @@ The request object provides the same request API available to route handlers, wh
 ```lua
 local middleware = Middleware.create(function(req, res, next)
     -- Before the route handler
-
     next()
-
     -- After the route handler
 end)
 ```
@@ -97,9 +106,7 @@ For example:
 ```lua
 local middleware = Middleware.create(function(req, res, next)
     table.insert(log, "before")
-
     next()
-
     table.insert(log, "after")
 end)
 ```
@@ -146,39 +153,155 @@ The execution flow is:
 
 ```text
 middleware1
-    ↓
+    V
 middleware2
-    ↓
+    V
 route handler
-    ↓
+    V
 middleware2-after
-    ↓
+    V
 middleware1-after
 ```
 
 Therefore, the resulting order is:
 
 ```text
-middleware1,middleware2,handler,middleware2-after,middleware1-after
+middleware1, middleware2, handler, middleware2-after, middleware1-after
 ```
 
 This follows the usual nested middleware model: each middleware must call `next()` to enter the next layer, and execution resumes after `next()` returns.
 
-## Middleware Errors
+## Async Middleware
 
-Errors raised by a middleware function are propagated as Lua middleware errors.
+Middleware can also perform asynchronous operations when attached to an async route.
+
+For example, middleware can execute an asynchronous database query before calling `next()`:
+
+```lua
+local auth = Middleware.create(function(req, res, next)
+    print("auth before")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync(
+        "SELECT id, name FROM users WHERE id = ?",
+        { 1 }
+    )
+
+    print("auth user:", result:toTable()[1].name)
+    next()
+    print("auth after")
+end)
+```
+
+It can then be attached to an async route:
+
+```lua
+Routes.getAsync("/async-middleware-db", function(req, res)
+    local db = Drogua.Database.get("default")
+
+    local result = db:queryAsync([[
+        SELECT id, name
+        FROM users
+        ORDER BY id
+    ]])
+
+    return {
+        success = true,
+        users = result:toTable()
+    }
+end, { auth })
+```
+
+Multiple middleware can perform asynchronous operations:
+
+```lua
+local logging = Middleware.create(function(req, res, next)
+    print("logging before")
+
+    local db = Drogua.Database.get("default")
+    local result = db:queryAsync(
+        "SELECT COUNT(*) AS total FROM users"
+    )
+
+    print("user count:", result:toTable()[1].total)
+
+    next()
+
+    print("logging after")
+end)
+```
+
+The execution order remains the same:
+
+```text
+auth
+    V
+logging
+    V
+route handler
+```
+
+Async operations complete before the middleware continues to `next()`.
+
+See [Database](database.md) for the asynchronous database API.
+
+## Middleware Short-Circuiting
+
+Middleware can stop request processing by sending a response without calling `next()`.
+
+```lua
+local auth = Middleware.create(function(req, res, next)
+    res:setStatus(401)
+    res:json({
+        error = "Unauthorized"
+    })
+
+    return
+end)
+```
 
 For example:
 
 ```lua
+Routes.getAsync("/protected", function(req, res)
+    return {
+        success = true
+    }
+end, { auth })
+```
+
+Because `auth` does not call `next()`, the route handler is not executed.
+
+The same behavior applies to synchronous routes.
+
+## Middleware Errors
+
+Errors raised by a middleware function are propagated through Drogua.
+
+```lua
 local middleware = Middleware.create(function(req, res, next)
     error("Something went wrong")
-
     next()
 end)
 ```
 
 The middleware execution fails and the error is propagated back through Drogua.
+
+This also applies to errors from asynchronous operations:
+
+```lua
+local middleware = Middleware.create(function(req, res, next)
+    local db = Drogua.Database.get("default")
+
+    local result = db:queryAsync(
+        "SELECT * FROM definitely_missing_table"
+    )
+
+    next()
+end)
+```
+
+If the asynchronous database operation fails, execution does not continue to `next()` or the route handler.
 
 ## Middleware API
 
@@ -226,6 +349,12 @@ Routes.post(path, handler, middleware)
 Routes.put(path, handler, middleware)
 Routes.delete(path, handler, middleware)
 Routes.patch(path, handler, middleware)
+
+Routes.getAsync(path, handler, middleware)
+Routes.postAsync(path, handler, middleware)
+Routes.putAsync(path, handler, middleware)
+Routes.deleteAsync(path, handler, middleware)
+Routes.patchAsync(path, handler, middleware)
 ```
 
 The middleware argument is a Lua array containing middleware objects:
@@ -242,7 +371,7 @@ The order of the array determines middleware execution order.
 
 ## Example
 
-A complete example:
+A complete example using synchronous and asynchronous middleware:
 
 ```lua
 local Routes = Drogua.Routes
@@ -250,28 +379,32 @@ local Middleware = Drogua.Middleware
 
 local logging = Middleware.create(function(req, res, next)
     Drogua.print(req:method() .. " " .. req:path())
-
     next()
 end)
 
 local headers = Middleware.create(function(req, res, next)
     res:setHeader("X-Powered-By", "Drogua")
-
     next()
 end)
 
-Routes.get(
-    "/api/example",
-    function(req)
-        return {
-            message = "Hello from the route"
-        }
-    end,
-    {
-        logging,
-        headers
+Routes.get("/api/example", function(req)
+    return {
+        message = "Hello from the route"
     }
-)
+end, { logging, headers })
+
+Routes.getAsync("/api/async", function(req)
+    local db = Drogua.Database.get("default")
+
+    local result = db:queryAsync(
+        "SELECT COUNT(*) AS total FROM users"
+    )
+
+    return {
+        message = "Hello from the async route",
+        users = result:toTable()[1].total
+    }
+end, { logging, headers })
 ```
 
 The request flows through the middleware chain before reaching the route handler:
@@ -279,17 +412,19 @@ The request flows through the middleware chain before reaching the route handler
 ```text
 Request
    │
-   ▼
+   V
 logging
    │
-   ▼
+   V
 headers
    │
-   ▼
+   V
 route handler
    │
-   ▼
+   V
 Response
 ```
 
 If middleware performs work after `next()`, execution then unwinds in reverse order.
+
+Async middleware follows the same middleware chain and execution model while allowing asynchronous operations such as database queries.
