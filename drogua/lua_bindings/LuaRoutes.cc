@@ -465,6 +465,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         throw std::runtime_error("Lua async coroutine has null state");
 
     std::shared_ptr<LuaAsyncMiddlewareContext> middlewareContext;
+
     if (middlewareChain && !middlewareChain->empty()) {
         middlewareContext = std::make_shared<LuaAsyncMiddlewareContext>(L);
         middlewareContext->coroutine = context->coroutine;
@@ -484,15 +485,14 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
     std::weak_ptr<LuaAsyncRouteContext> weakContext = context;
     std::weak_ptr<LuaAsyncMiddlewareContext> weakMiddlewareContext = middlewareContext;
+
     auto resumeCoroutine = [weakContext, weakMiddlewareContext]() {
         auto context = weakContext.lock();
-
         if (!context || !context->coroutine)
             return;
 
         auto middlewareContext = weakMiddlewareContext.lock();
         auto* ownerLoop = context->ownerLoop;
-
         if (!ownerLoop) {
             LOG_ERROR << "Lua async coroutine has no owner loop";
             return;
@@ -509,14 +509,9 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
             lua_pushboolean(co, 1);
 
             auto resumeResult = LuaCoroutineManager::resume(context->coroutine, 1);
+
             if (resumeResult.status == LuaCoroutineManager::Status::Error) {
-                auto callback = std::move(context->callback);
-                std::string error = "Lua async route handler failed: " + resumeResult.error;
-
-                LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-                if (callback)
-                    LuaRoutes::sendErrorResponse(error, std::move(callback));
-
+                LuaRoutes::failAsyncRoute(context, middlewareContext, "Lua async route handler failed: " + resumeResult.error);
                 return;
             }
 
@@ -533,67 +528,35 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
             }
 
             if (resumeResult.status != LuaCoroutineManager::Status::Finished) {
-                auto callback = std::move(context->callback);
-                LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                if (callback)
-                    LuaRoutes::sendErrorResponse("Unknown async coroutine state", std::move(callback));
-
+                LuaRoutes::failAsyncRoute(context, middlewareContext, "Unknown async coroutine state");
                 return;
             }
 
-            // Middleware finished
+            // Middleware finished.
             if (middlewareContext) {
                 if (middlewareContext->hasRouteResponse && middlewareContext->response && middlewareContext->response->response()) {
-                    auto callback = std::move(middlewareContext->callback);
-                    auto response = middlewareContext->response->response();
-                    LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                    if (callback)
-                        callback(response);
-
+                    LuaRoutes::finishAsyncRoute(context, middlewareContext, middlewareContext->response->response());
                     return;
                 }
 
                 if (middlewareContext->response && middlewareContext->response->response()) {
-                    auto callback = std::move(middlewareContext->callback);
-                    auto response = middlewareContext->response->response();
-                    LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                    if (callback)
-                        callback(response);
-
+                    LuaRoutes::finishAsyncRoute(context, middlewareContext, middlewareContext->response->response());
                     return;
                 }
 
                 if (resumeResult.nresults < 1) {
-                    auto callback = std::move(middlewareContext->callback);
-                    LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                    if (callback)
-                        LuaRoutes::sendErrorResponse("Async route handler must return a table or Drogua.Response", std::move(callback));
-
+                    LuaRoutes::failAsyncRoute(context, middlewareContext, "Async route handler must return a table or Drogua.Response");
                     return;
                 }
 
                 try {
                     auto response = LuaRoutes::luaResultToResponse(co, -1);
-                    auto callback = std::move(middlewareContext->callback);
-                    LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                    if (callback)
-                        callback(response);
-
+                    LuaRoutes::finishAsyncRoute(context, middlewareContext, response);
                     return;
                 }
 
                 catch (const std::exception& e) {
-                    auto callback = std::move(middlewareContext->callback);
-                    LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-                    if (callback)
-                        LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-
+                    LuaRoutes::failAsyncRoute(context, middlewareContext, e.what());
                     return;
                 }
 
@@ -601,33 +564,18 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
             // Normal async route finished.
             if (resumeResult.nresults < 1) {
-                auto callback = std::move(context->callback);
-                LuaRoutes::cleanupAsyncRoute(context, nullptr);
-
-                if (callback)
-                    LuaRoutes::sendErrorResponse("Async route handler must return a table or Drogua.Response", std::move(callback));
-
+                LuaRoutes::failAsyncRoute(context, nullptr, "Async route handler must return a table or Drogua.Response");
                 return;
             }
 
             try {
                 auto response = LuaRoutes::luaResultToResponse(co, -1);
-                auto callback = std::move(context->callback);
-                LuaRoutes::cleanupAsyncRoute(context, nullptr);
-
-                if (callback)
-                    callback(response);
-
+                LuaRoutes::finishAsyncRoute(context, nullptr, response);
                 return;
             }
 
             catch (const std::exception& e) {
-                auto callback = std::move(context->callback);
-                LuaRoutes::cleanupAsyncRoute(context, nullptr);
-
-                if (callback)
-                    LuaRoutes::sendErrorResponse(e.what(), std::move(callback));
-
+                LuaRoutes::failAsyncRoute(context, nullptr, e.what());
                 return;
             }
         });
@@ -662,7 +610,6 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         if (resumeResult.nresults == 1 && lua_isboolean(co, -1)) {
             if (middlewareContext && middlewareContext->resume)
                 middlewareContext->resume();
-
             else if (context->resume)
                 context->resume();
         }
@@ -673,7 +620,6 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
     if (resumeResult.status == LuaCoroutineManager::Status::Error) {
         std::string error = "Lua async route handler failed: " + resumeResult.error;
         LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
         throw std::runtime_error(error);
     }
 
@@ -685,24 +631,12 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
     /* Middleware finished immediately. */
     if (middlewareContext) {
         if (middlewareContext->hasRouteResponse && middlewareContext->response && middlewareContext->response->response()) {
-            auto callback = std::move(middlewareContext->callback);
-            auto response = middlewareContext->response->response();
-            LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-            if (callback)
-                callback(response);
-
+            LuaRoutes::finishAsyncRoute(context, middlewareContext, middlewareContext->response->response());
             return;
         }
 
         if (middlewareContext->response && middlewareContext->response->response()) {
-            auto callback = std::move(middlewareContext->callback);
-            auto response = middlewareContext->response->response();
-            LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-            if (callback)
-                callback(response);
-
+            LuaRoutes::finishAsyncRoute(context, middlewareContext, middlewareContext->response->response());
             return;
         }
 
@@ -713,12 +647,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
         try {
             auto response = LuaRoutes::luaResultToResponse(co, -1);
-            auto callback = std::move(middlewareContext->callback);
-            LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
-
-            if (callback)
-                callback(response);
-
+            LuaRoutes::finishAsyncRoute(context, middlewareContext, response);
             return;
         }
 
@@ -726,10 +655,9 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
             LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
             throw;
         }
-
     }
 
-    // Normal async route finished immediately. 
+    // Normal async route finished immediately.
     if (resumeResult.nresults < 1) {
         LuaRoutes::cleanupAsyncRoute(context, nullptr);
         throw std::runtime_error("Lua async route handler must return a table or Drogua.Response");
@@ -737,12 +665,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
 
     try {
         auto response = LuaRoutes::luaResultToResponse(co, -1);
-        auto callback = std::move(context->callback);
-        LuaRoutes::cleanupAsyncRoute(context, nullptr);
-
-        if (callback)
-            callback(response);
-
+        LuaRoutes::finishAsyncRoute(context, nullptr, response);
         return;
     }
 
@@ -751,6 +674,7 @@ void LuaRoutes::executeLuaFunctionAsync(const luabridge::LuaRef& handler, const 
         throw;
     }
 }
+
 
 void LuaRoutes::pushAsyncMiddleware(const std::shared_ptr<LuaAsyncMiddlewareContext>& context) {
     if (!context || !context->coroutine) {
@@ -862,4 +786,20 @@ drogon::HttpResponsePtr LuaRoutes::luaResultToResponse(lua_State* L, int index) 
     }
 
     throw std::runtime_error("Lua async route handler must return a table or Drogua.Response");
+}
+
+void LuaRoutes::finishAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& context, const std::shared_ptr<LuaAsyncMiddlewareContext>& middlewareContext, const drogon::HttpResponsePtr& response) {
+    auto callback = std::move(middlewareContext ? middlewareContext->callback : context->callback);
+    cleanupAsyncRoute(context, middlewareContext);
+
+    if (callback)
+        callback(response);
+}
+
+void LuaRoutes::failAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& context, const std::shared_ptr<LuaAsyncMiddlewareContext>& middlewareContext, const std::string& message) {
+    auto callback = std::move(middlewareContext ? middlewareContext->callback : context->callback);
+    cleanupAsyncRoute(context, middlewareContext);
+
+    if (callback)
+        sendErrorResponse(message, std::move(callback));
 }
