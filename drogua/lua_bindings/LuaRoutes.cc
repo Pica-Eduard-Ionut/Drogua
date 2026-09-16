@@ -49,41 +49,35 @@ int LuaRoutes::luaPatchAsync(lua_State *L) {
 }
 
 int LuaRoutes::luaRegister(lua_State *L, drogon::HttpMethod method, const char *methodName) {
-    const int argc = lua_gettop(L);
-
-    if (argc < 2 || argc > 3)
-        return luaL_error(L, "Drogua.Routes.%s expects 2 or 3 arguments", methodName);
-
-    // Argument 1: path
-    const char *path = luaL_checkstring(L, 1);
-
-    // Argument 2: handler
-    auto handler = luabridge::Stack<luabridge::LuaRef>::get(L, 2);
-    if (!handler)
-        return luaL_error(L, "Invalid route handler: %s", handler.message().c_str());
-
     try {
-        // Argument 3: optional middleware table
-        if (argc == 3) {
-            if (!lua_istable(L, 3))
-                return luaL_error(L, "Route middleware must be a table");
+        const int argc = lua_gettop(L);
+        auto args = parseRouteArgs(L, methodName);
 
-            auto middleware = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
-            if (!middleware)
-                return luaL_error(L, "Invalid middleware table: %s", middleware.message().c_str());
-
-            LuaMiddlewareManager::instance().add(method, path, middleware.value());
-        }
-
-        registerRoute(path, method, handler.value());
-    }
-
-    catch (const std::exception &e) {
+        registerMiddleware(L, argc, method, args.path);
+        registerRoute(args.path, method, args.handler);
+        
+    } catch (const std::exception &e) {
         return luaL_error(L, "%s", e.what());
     }
 
     return 0;
 }
+
+int LuaRoutes::luaRegisterAsync(lua_State *L, drogon::HttpMethod method, const char *methodName) {
+    try {
+        const int argc = lua_gettop(L);
+        auto args = parseRouteArgs(L, methodName);
+
+        registerMiddleware(L, argc, method, args.path);
+        registerAsyncRoute(args.path, method, args.handler);
+
+    } catch (const std::exception &e) {
+        return luaL_error(L, "%s", e.what());
+    }
+
+    return 0;
+}
+
 
 Json::Value LuaRoutes::luaValueToJson(lua_State *L, int index) {
     switch (lua_type(L, index)) {
@@ -379,47 +373,6 @@ drogon::HttpResponsePtr LuaRoutes::executeRoute(const std::string &path, drogon:
     }
 
     return executeHandler(handler, req, params);
-}
-
-int LuaRoutes::luaRegisterAsync(lua_State* L, drogon::HttpMethod method, const char* methodName) {
-    const int argc = lua_gettop(L);
-    if (argc < 2 || argc > 3) {
-        return luaL_error(L, "Drogua.Routes.%s expects 2 or 3 arguments", methodName);
-    }
-
-    // Argument 1: path
-    const char* path = luaL_checkstring(L, 1);
-    // Argument 2: handler
-    auto handler = luabridge::Stack<luabridge::LuaRef>::get(L, 2);
-    if (!handler) {
-        return luaL_error(L, "Invalid async route handler: %s", handler.message().c_str());
-    }
-
-    try {
-        // Optional middleware.
-        if (argc == 3) {
-            if (!lua_istable(L, 3)) {
-                return luaL_error(L, "Route middleware must be a table");
-            }
-
-            auto middleware = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
-            if (!middleware) {
-                return luaL_error(L, "Invalid middleware table: %s", middleware.message().c_str());
-            }
-
-            // Register middleware for this route.
-            LuaMiddlewareManager::instance().add(method, path, middleware.value());
-        }
-
-        // Register the async route itself.
-        registerAsyncRoute(path, method, handler.value());
-    }
-
-    catch (const std::exception& e) {
-        return luaL_error(L, "%s", e.what());
-    }
-
-    return 0;
 }
 
 void LuaRoutes::registerAsyncRoute(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler) {
@@ -974,3 +927,35 @@ void LuaRoutes::cleanupAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& c
     context->coroutine.reset();
     if (middlewareContext) middlewareContext->coroutine.reset();
 }
+
+LuaRoutes::LuaRouteArgs LuaRoutes::parseRouteArgs(lua_State *L, const char *methodName) {
+    const int argc = lua_gettop(L);
+    if (argc < 2 || argc > 3) {
+        throw std::runtime_error(std::string("Drogua.Routes.") + methodName + " expects 2 or 3 arguments");
+    }
+
+    const char *path = luaL_checkstring(L, 1);
+    auto handler = luabridge::Stack<luabridge::LuaRef>::get(L, 2);
+    if (!handler) {
+        throw std::runtime_error("Invalid route handler: " + handler.message());
+    }
+
+    return {path, handler.value()};
+}
+
+void LuaRoutes::registerMiddleware(lua_State *L, int argc, drogon::HttpMethod method, const std::string &path) {
+    if (argc != 3)
+        return;
+
+    if (!lua_istable(L, 3)) {
+        throw std::runtime_error("Route middleware must be a table");
+    }
+
+    auto middleware = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
+    if (!middleware) {
+        throw std::runtime_error("Invalid middleware table: " + middleware.message());
+    }
+
+    LuaMiddlewareManager::instance().add(method, path, middleware.value());
+}
+

@@ -104,5 +104,13 @@ class LuaRoutes {
 
         static int luaRegister(lua_State *L, drogon::HttpMethod method, const char *methodName);
 
+        struct LuaRouteArgs {
+            std::string path;
+            luabridge::LuaRef handler;
+        };
+
+        static LuaRouteArgs parseRouteArgs(lua_State *L, const char *methodName);
+        static void registerMiddleware(lua_State *L, int argc, drogon::HttpMethod method, const std::string &path);
+
         static void cleanupAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& context, const std::shared_ptr<LuaAsyncMiddlewareContext>& middlewareContext);
 };
