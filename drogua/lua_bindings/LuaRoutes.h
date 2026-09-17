@@ -78,6 +78,42 @@ class LuaRoutes {
             );
         }
 
+        template <typename Register>
+        static void registerRouteWithParameters(const std::string& path, drogon::HttpMethod method, const luabridge::LuaRef& handler, const char* tooManyParamsMessage, Register&& registerFn) {
+            switch (countPathParameters(path)) {
+                case 0:
+                    registerFn.template operator()<>();
+                    break;
+                    
+                case 1:
+                    registerFn.template operator()<std::string>();
+                    break;
+
+                case 2:
+                    registerFn.template operator()<std::string, std::string>();
+                    break;
+
+                case 3:
+                    registerFn.template operator()<std::string, std::string, std::string>();
+                    break;
+
+                case 4:
+                    registerFn.template operator()<std::string, std::string, std::string, std::string>();
+                    break;
+
+                case 5:
+                    registerFn.template operator()<std::string, std::string, std::string, std::string, std::string>();
+                    break;
+
+                case 6:
+                    registerFn.template operator()<std::string, std::string, std::string, std::string, std::string, std::string>();
+                    break;
+
+                default:
+                    throw std::runtime_error(tooManyParamsMessage);
+            }
+        }
+
         static drogon::HttpResponsePtr executeHandler(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params);
         static drogon::HttpResponsePtr executeLuaTable(const luabridge::LuaRef &handler);
         static drogon::HttpResponsePtr executeLuaFunction(const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params);
