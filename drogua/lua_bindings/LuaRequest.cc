@@ -20,6 +20,10 @@ std::string LuaRequest::ip() const {
     return request_->getPeerAddr().toIp();
 }
 
+bool LuaRequest::connected() const noexcept {
+    return request_ && request_->connected();
+}
+
 // Query parameters
 std::string LuaRequest::query(const std::string& key) const {
     return request_->getParameter(key);

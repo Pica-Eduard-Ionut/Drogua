@@ -170,12 +170,17 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
     context->coroutine = routeContext->coroutine;
     context->callback = routeContext->callback;
     context->resume = routeContext->resume;
+    context->request = routeContext->request; 
     LuaAsyncContextRegistry::set<LuaAsyncTransactionContext>(L, context);
     // === Execute query with unified callback factory ===
     try {
         auto [successCb, errorCb] = [context]() {
             return std::make_pair(
                 [context](std::shared_ptr<LuaResult> result) {
+                    // drop if disconnected
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult = std::move(result);
                     context->asyncError.clear();
 
@@ -184,6 +189,10 @@ int LuaTransaction::queryAsyncLua(lua_State* L) {
                 },
 
                 [context](const std::string& error) {
+                    // drop if disconnected
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult.reset();
                     context->asyncError = error;
 

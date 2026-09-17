@@ -13,6 +13,7 @@ class LuaRequest {
         std::string path() const;
         bool secure() const;
         std::string ip() const;
+        bool connected() const noexcept;
         
         // Query parameters
         std::string query(const std::string& key) const;

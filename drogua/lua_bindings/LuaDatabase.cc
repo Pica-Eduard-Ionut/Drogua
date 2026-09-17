@@ -168,7 +168,6 @@ void LuaDatabase::queryAsync(const std::string& sql, const luabridge::LuaRef& pa
     binder.exec();
 }
 
-
 int LuaDatabase::queryAsyncLua(lua_State* L) {
     if (!L) {
         return luaL_error(L, "Database queryAsync received null Lua state");
@@ -195,9 +194,6 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
         return luaL_error(L, "Database queryAsync expects sql and optional parameters");
     }
 
-    /*
-     * queryAsync() must be called from an async Lua route.
-     */
     auto routeContext = LuaAsyncContextRegistry::get<LuaAsyncRouteContext>(L);
     if (!routeContext) {
         return luaL_error(L, "Database queryAsync must be called from an async route");
@@ -214,6 +210,7 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
     context->coroutine = routeContext->coroutine;
     context->callback = routeContext->callback;
     context->resume = routeContext->resume;
+    context->request = routeContext->request;
 
     /*
      * Register the DB context separately from the route context.
@@ -224,78 +221,88 @@ int LuaDatabase::queryAsyncLua(lua_State* L) {
         if (argc == 3) {
             if (!lua_istable(L, 3)) {
                 clearAsyncDatabaseContext(L, context);
-
                 return luaL_error(L, "Database queryAsync parameters must be a table");
             }
 
             auto paramsResult = luabridge::Stack<luabridge::LuaRef>::get(L, 3);
             if (!paramsResult) {
                 clearAsyncDatabaseContext(L, context);
-
                 return luaL_error(L, "Invalid query parameters: %s", paramsResult.message().c_str());
             }
 
             auto params = paramsResult.value();
             db->queryAsync(sql, params, 
                 [context](std::shared_ptr<LuaResult> result) {
+                    // GUARD: Client disconnected, drop the result and DO NOT resume
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult = std::move(result);
                     context->asyncError.clear();
 
                     if (context->resume) {
                         context->resume();
-
                     } else {
                         LOG_ERROR << "Lua async database query completed, but no resume handler is installed";
                     }
                 },
-
                 [context](const std::string& error) {
+                    // GUARD: Client disconnected, drop the error and DO NOT resume
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult.reset();
                     context->asyncError = error;
 
                     if (context->resume) {
                         context->resume();
-
                     } else {
                         LOG_ERROR << "Lua async database query failed, but no resume handler is installed";
                     }
                 });
+                
         } else {
             db->queryAsync(sql, 
                 [context](std::shared_ptr<LuaResult> result) {
+                    // GUARD
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult = std::move(result);
                     context->asyncError.clear();
 
                     if (context->resume) {
                         context->resume();
-
                     } else {
                         LOG_ERROR << "Lua async database query completed, but no resume handler is installed";
                     }
                 },
-
                 [context](const std::string& error) {
+                    // GUARD
+                    if (context->request && !context->request->connected()) {
+                        return;
+                    }
                     context->asyncResult.reset();
                     context->asyncError = error;
 
                     if (context->resume) {
                         context->resume();
-
                     } else {
                         LOG_ERROR << "Lua async database query failed, but no resume handler is installed";
                     }
                 });
         }
+
     } catch (const std::exception& e) {
         clearAsyncDatabaseContext(L, context);
-
         return luaL_error(L, "Async database query failed: %s", e.what());
     }
 
     /*
      * Suspend the Lua coroutine.
      *
-     * The database callback will eventually call context->resume().
+     * The database callback will eventually call context->resume() 
+     * ONLY IF the client is still connected.
      */
     return lua_yieldk(L, 0, 0, &LuaDatabase::queryAsyncContinuation);
 }
@@ -367,7 +374,6 @@ int LuaDatabase::queryAsyncContinuation(lua_State *L, int status, lua_KContext c
     return 1;
 }
 
-
 // async transaction
 void LuaDatabase::beginAsync(std::function<void(std::shared_ptr<LuaTransaction>)> callback, std::function<void(const std::string&)> errorCallback) {
     if (!client_) {
@@ -432,11 +438,16 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
     transactionContext->coroutine = routeContext->coroutine;
     transactionContext->callback = routeContext->callback;
     transactionContext->resume = routeContext->resume;
+    transactionContext->request = routeContext->request; 
     // Register the transaction context.
     LuaAsyncContextRegistry::set<LuaAsyncTransactionContext>(L, transactionContext);
 
     try {
         db->beginAsync([transactionContext](std::shared_ptr<LuaTransaction> transaction) {
+            // drop if disconnected
+            if (transactionContext->request && !transactionContext->request->connected()) {
+                return;
+            }
             transactionContext->asyncError.clear();
             transactionContext->transaction = std::move(transaction);
 
@@ -444,6 +455,10 @@ int LuaDatabase::beginAsyncLua(lua_State* L) {
                 transactionContext->resume();
             }
         }, [transactionContext](const std::string& error) {
+            // drop if disconnected
+            if (transactionContext->request && !transactionContext->request->connected()) {
+                return;
+            }
             transactionContext->transaction.reset();
             transactionContext->asyncError = error;
 
@@ -506,8 +521,7 @@ int LuaDatabase::beginAsyncContinuation(lua_State* L, int status, lua_KContext c
     return 1;
 }
 
-void LuaDatabase::clearAsyncDatabaseContext(
-    lua_State* L, const std::shared_ptr<LuaAsyncDatabaseContext>& context) {
+void LuaDatabase::clearAsyncDatabaseContext(lua_State* L, const std::shared_ptr<LuaAsyncDatabaseContext>& context) {
     if (!L || !context) {
         return;
     }

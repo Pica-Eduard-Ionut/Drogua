@@ -21,10 +21,12 @@ struct LuaAsyncContext {
     std::function<void()> resume;
     trantor::EventLoop* ownerLoop = nullptr;
     std::function<void(const drogon::HttpResponsePtr&)> callback;
+    // Shared pointer allows Route, Database, and Transaction contexts to safely check connection status
+    std::shared_ptr<LuaRequest> request; 
 };
 
 struct LuaAsyncRouteContext : LuaAsyncContext {
-    std::unique_ptr<LuaRequest> request;
+    // std::unique_ptr<LuaRequest> request;
     luabridge::LuaRef handler;
     std::vector<std::string> params;
 
@@ -46,7 +48,7 @@ struct LuaAsyncTransactionContext : LuaAsyncContext {
 };
 
 struct LuaAsyncMiddlewareContext : LuaAsyncContext {
-    std::unique_ptr<LuaRequest> request;
+    // std::unique_ptr<LuaRequest> request;
     std::unique_ptr<LuaResponse> response;
     bool hasRouteResponse = false;
 

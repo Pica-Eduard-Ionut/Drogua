@@ -605,7 +605,7 @@ void LuaRoutes::failAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& cont
 std::shared_ptr<LuaAsyncRouteContext> LuaRoutes::createAsyncContext(lua_State* L, const luabridge::LuaRef& handler, const drogon::HttpRequestPtr& req, const std::vector<std::string>& params, std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
     auto context = std::make_shared<LuaAsyncRouteContext>(L);
     context->handler = handler;
-    context->request = std::make_unique<LuaRequest>(req);
+    context->request = std::make_shared<LuaRequest>(req);
     context->params = params;
     context->callback = std::move(callback);
     context->coroutine = LuaCoroutineManager::create(L);
@@ -624,7 +624,7 @@ std::shared_ptr<LuaAsyncMiddlewareContext> LuaRoutes::createMiddlewareContext(lu
     auto middlewareContext = std::make_shared<LuaAsyncMiddlewareContext>(L);
     middlewareContext->coroutine = context->coroutine;
     middlewareContext->callback = context->callback;
-    middlewareContext->request = std::make_unique<LuaRequest>(req);
+    middlewareContext->request = std::make_shared<LuaRequest>(req);
     middlewareContext->response = std::make_unique<LuaResponse>();
     middlewareContext->hasRouteResponse = false;
     middlewareContext->middlewareIndex = 0;
@@ -706,6 +706,12 @@ void LuaRoutes::handleAsyncFinished(const LuaCoroutineManager::ResumeResult& res
 void LuaRoutes::resumeAsyncRoute(const std::shared_ptr<LuaAsyncRouteContext>& context, const std::shared_ptr<LuaAsyncMiddlewareContext>& middlewareContext) {
     if (!context || !context->coroutine)
         return;
+
+    // Client disconnected — don't resume the Lua coroutine.
+    if (!context->request || !context->request->connected()) {
+        LuaRoutes::cleanupAsyncRoute(context, middlewareContext);
+        return;
+    }
 
     lua_State* co = LuaCoroutineManager::state(context->coroutine);
     if (!co)
