@@ -11,8 +11,6 @@
 
 class LuaResult;
 
-void bindLuaParameters(drogon::orm::internal::SqlBinder& binder, const luabridge::LuaRef& params);
-
 class LuaTransaction {
     public:
         explicit LuaTransaction(std::shared_ptr<drogon::orm::Transaction> transaction);
@@ -45,7 +43,6 @@ class LuaTransaction {
 
         // validation and cleanup helpers
         void ensureValid() const;
-        void ensureParamsTable(const luabridge::LuaRef& params) const;
         void finishTransaction() noexcept;
         // execution helpers
         std::shared_ptr<LuaResult> executeQueryInternal(const std::string& sql, const luabridge::LuaRef* params);

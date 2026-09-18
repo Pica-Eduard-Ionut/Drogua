@@ -53,14 +53,6 @@ class LuaDatabase {
     private:
         std::string name_;
         drogon::orm::DbClientPtr client_;
-        static void clearAsyncDatabaseContext(lua_State* L, const std::shared_ptr<LuaAsyncDatabaseContext>& context);
-
-        struct AsyncSetup {
-            LuaDatabase* db;
-            std::shared_ptr<LuaAsyncRouteContext> routeContext;
-        };
-
-        static AsyncSetup getAsyncContexts(lua_State* L, const char* funcName);
         void checkClient() const;
 
         template <typename Func>
