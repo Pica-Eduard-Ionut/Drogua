@@ -54,4 +54,34 @@ class LuaDatabase {
         std::string name_;
         drogon::orm::DbClientPtr client_;
         static void clearAsyncDatabaseContext(lua_State* L, const std::shared_ptr<LuaAsyncDatabaseContext>& context);
+
+        struct AsyncSetup {
+            LuaDatabase* db;
+            std::shared_ptr<LuaAsyncRouteContext> routeContext;
+        };
+
+        static AsyncSetup getAsyncContexts(lua_State* L, const char* funcName);
+        void checkClient() const;
+
+        template <typename Func>
+        auto runDbOperation(const std::string& actionName, Func&& func) {
+            try {
+                return func();
+            }
+
+            catch (const drogon::orm::DrogonDbException& e) {
+                throw std::runtime_error(actionName + " [" + name_ + "]: " + std::string(e.base().what()));
+            }
+
+            catch (const std::exception& e) {
+                throw std::runtime_error(actionName + " [" + name_ + "]: " + std::string(e.what()));
+            }
+        }
+
+        template <typename CallbackT>
+        void validateAsyncCallbacks(const std::function<CallbackT>& callback, const std::function<void(const std::string&)>& errorCallback) const {
+            if (!callback) throw std::runtime_error("LuaDatabase async callback is empty");
+            
+            if (!errorCallback) throw std::runtime_error("LuaDatabase async error callback is empty");
+        }
 };
