@@ -318,8 +318,7 @@ drogon::HttpResponsePtr LuaRoutes::executeMiddlewareChain(const LuaMiddlewareMan
     return res.response();
 }
 
-drogon::HttpResponsePtr LuaRoutes::executeRoute(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params)
-{
+drogon::HttpResponsePtr LuaRoutes::executeRoute(const std::string &path, drogon::HttpMethod method, const luabridge::LuaRef &handler, const drogon::HttpRequestPtr &req, const std::vector<std::string> &params) {
     LuaRequest luaRequest(req);
     LuaResponse luaResponse;
     const auto *chain = LuaMiddlewareManager::instance().get(method, path);
@@ -558,9 +557,7 @@ void LuaRoutes::registerMiddleware(lua_State *L, int argc, drogon::HttpMethod me
 drogon::HttpResponsePtr LuaRoutes::luaResultToResponse(lua_State* L, int index) {
     auto result = luabridge::Stack<luabridge::LuaRef>::get(L, index);
     if (!result) {
-        throw std::runtime_error(
-            "Failed to retrieve Lua async route result: " +
-            result.message());
+        throw std::runtime_error("Failed to retrieve Lua async route result: " + result.message());
     }
 
     const auto& luaResult = result.value();

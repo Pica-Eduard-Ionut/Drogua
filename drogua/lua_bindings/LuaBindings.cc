@@ -11,6 +11,8 @@
 #include <lua_bindings/LuaRow.h>
 #include <lua_bindings/LuaTransaction.h>
 #include <lua_bindings/LuaMiddlewareManager.h>
+#include <lua_bindings/LuaHttp.h>
+#include <lua_bindings/LuaHttpResult.h>
 
 #include <iostream>
 #include <string>
@@ -135,6 +137,22 @@ void registerDrogua(lua_State* L) {
 
             .beginNamespace("Middleware")
                 .addFunction("create", &LuaMiddlewareManager::luaCreate)
+            .endNamespace()
+
+            // HTTP response
+            .beginClass<LuaHttpResult>("HttpResult")
+                .addFunction("status", &LuaHttpResult::status)
+                .addFunction("statusMessage", &LuaHttpResult::statusMessage)
+                .addFunction("body", &LuaHttpResult::body)
+                .addFunction("headers", &LuaHttpResult::headers)
+                .addFunction("json", &LuaHttpResult::json)
+                .addFunction("ok", &LuaHttpResult::ok)
+                .addFunction("toTable", &LuaHttpResult::toTable)
+            .endClass()
+
+            // HTTP client
+            .beginNamespace("Http")
+                .addFunction("requestAsync", static_cast<int (*)(lua_State*)>(&LuaHttp::requestAsync))
             .endNamespace()
             
         .endNamespace();

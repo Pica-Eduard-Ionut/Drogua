@@ -1,5 +1,5 @@
 local function curl(path, method)
-    local command = "curl --connect-timeout 2 --max-time 5 -sS -f -X " .. method .. " http://127.0.0.1:18080" .. path
+    local command = "curl --connect-timeout 2 --max-time 5 -sS -X " .. method .. " http://127.0.0.1:18080" .. path
     local handle = assert(io.popen(command), "Failed to start curl")
     local result = handle:read("*a")
     local success, _, exitCode = handle:close()

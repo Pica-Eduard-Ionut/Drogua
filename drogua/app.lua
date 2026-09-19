@@ -511,4 +511,222 @@ Drogua.Routes.getAsync(
     end
 )
 
+-- 1. GET target
+Drogua.Routes.get("/http-test/target/get", function(req)
+
+    print("========================================")
+    print(">>> INTERNAL HTTP TARGET WAS HIT <<<")
+    print("method:", req:method())
+    print("========================================")
+
+    return {
+        success = true,
+        method = req:method(),
+        message = "GET request received",
+        user_agent = req:header("User-Agent") or "missing"
+    }
+
+end)
+
+
+-- 2. JSON POST target
+Drogua.Routes.post("/http-test/target/post", function(req)
+
+    local body = req:json()
+
+    return {
+        success = true,
+        method = req:method(),
+        message = "JSON POST received",
+        received = body
+    }
+
+end)
+
+
+-- 3. Raw body POST target
+Drogua.Routes.post("/http-test/target/raw", function(req)
+
+    return {
+        success = true,
+        method = req:method(),
+        message = "Raw POST received",
+        raw_body = req:body(),
+        content_type = req:header("Content-Type") or "missing"
+    }
+
+end)
+
+
+-- 4. HTTP 500 target
+Drogua.Routes.get("/http-test/target/error", function(req)
+
+    local resp = Drogua.Response()
+
+    resp:setStatus(500)
+    resp:setContentType("application/json")
+    resp:setBody('{"success":false,"error":"intentional test error"}')
+
+    return resp
+
+end)
+
+
+-- 5. Response headers target
+Drogua.Routes.get("/http-test/target/headers", function(req)
+
+    local resp = Drogua.Response()
+
+    resp:setStatus(200)
+    resp:setHeader("X-Drogua-Test", "hello")
+    resp:setHeader("X-Drogua-Number", "123")
+    resp:setContentType("application/json")
+    resp:setBody('{"success":true}')
+
+    return resp
+
+end)
+
+
+-- ASYNCHRONOUS HTTP CLIENT TESTS
+Drogua.Routes.getAsync("/http-test/async-get", function(req)
+    print(">>> BEFORE HTTP")
+
+    local response = Drogua.Http.requestAsync(
+        "http://127.0.0.1:5555/http-test/target/get",
+        {
+            method = "GET"
+        }
+    )
+
+    print(">>> AFTER HTTP")
+    print("status:", response:status())
+    print("body:", response:body())
+
+    return {
+        status = response:status(),
+        body = response:body()
+    }
+end)
+
+-- 12. Async POST with Lua table
+Drogua.Routes.postAsync("/http-test/async-post", function(req)
+
+    local payload = {
+        operation = "async-test",
+
+        values = {
+            10,
+            20,
+            30
+        },
+
+        nested = {
+            enabled = true
+        }
+    }
+
+    local resp = Drogua.Http.requestAsync(
+        "http://127.0.0.1:5555/http-test/target/post",
+        {
+            method = "POST",
+
+            headers = {
+                ["Content-Type"] = "application/json"
+            },
+
+            body = payload
+        }
+    )
+
+    if not resp:ok() then
+        return {
+            success = false,
+            status = resp:status(),
+            error = resp:statusMessage()
+        }
+    end
+
+    local data = resp:json()
+
+    return {
+        success = true,
+        status = resp:status(),
+        echoed = data.received
+    }
+
+end)
+
+
+-- 13. Async POST with retry configuration
+Drogua.Routes.postAsync("/http-test/async-post-retry", function(req)
+
+    local payload = {
+        test = "retry-configuration",
+
+        values = {
+            1,
+            2,
+            3
+        }
+    }
+
+    local resp = Drogua.Http.requestAsync(
+        "http://127.0.0.1:5555/http-test/target/post",
+        {
+            method = "POST",
+
+            headers = {
+                ["Content-Type"] = "application/json"
+            },
+
+            body = payload,
+
+            retry = {
+                count = 2,
+                delay = 100
+            }
+        }
+    )
+
+    return {
+        success = resp:ok(),
+        status = resp:status(),
+        response = resp:json()
+    }
+
+end)
+
+
+-- 14. Async HTTP 500
+Drogua.Routes.getAsync("/http-test/async-error", function(req)
+
+    local resp = Drogua.Http.requestAsync(
+        "http://127.0.0.1:5555/http-test/target/error",
+        {
+            method = "GET"
+        }
+    )
+
+    if resp:ok() then
+        return {
+            success = false,
+            unexpected = true,
+            status = resp:status()
+        }
+    end
+
+    return {
+        success = true,
+        status = resp:status(),
+        error = resp:json().error
+    }
+
+end)
+
+
+-- ============================================================
+-- START APPLICATION
+-- ============================================================
+
 Drogua.app():run()

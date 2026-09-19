@@ -15,6 +15,7 @@
 #include "LuaTransaction.h"
 #include "LuaMiddlewareManager.h"
 #include "LuaResponse.h"
+#include "LuaHttpResult.h"
 
 struct LuaAsyncContext {
     LuaCoroutineManager::Ptr coroutine;
@@ -61,4 +62,16 @@ struct LuaAsyncMiddlewareContext : LuaAsyncContext {
     LuaAsyncMiddlewareContext(lua_State* L)
         : handler(L) {
     }
+};
+
+struct LuaAsyncHttpContext : LuaAsyncContext {
+    std::shared_ptr<LuaHttpResult> asyncResult;
+    std::string asyncError;
+    drogon::HttpRequestPtr httpRequest;
+    
+    int retryCount = 0;
+    int maxRetries = 0;
+    int retryDelayMs = 100;
+    
+    std::string url;
 };

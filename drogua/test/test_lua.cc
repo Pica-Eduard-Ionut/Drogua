@@ -137,3 +137,15 @@ DROGON_TEST(LuaAsyncMiddlewareIntegration) {
     CHECK(runLuaFile(L, "lua/test_async_middleware.lua"));
     CHECK(runLuaFile(L, "lua/test_async_middleware_http.lua"));
 }
+
+DROGON_TEST(LuaAsyncHttpRequestIntegration) {
+    lua_State* L = luaL_newstate();
+    REQUIRE(L != nullptr);
+
+    luaL_openlibs(L);
+    registerDrogua(L);
+
+    CHECK(runLuaFile(L, "lua/test_async_http_target.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_httprequest.lua"));
+    CHECK(runLuaFile(L, "lua/test_async_httprequest_http.lua"));
+}
