@@ -428,3 +428,6 @@ Response
 If middleware performs work after `next()`, execution then unwinds in reverse order.
 
 Async middleware follows the same middleware chain and execution model while allowing asynchronous operations such as database queries.
+
+---
+**Next:** [**Http Request**](http-request.md)
