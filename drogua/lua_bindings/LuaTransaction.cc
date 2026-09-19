@@ -18,14 +18,21 @@ LuaTransaction::LuaTransaction(std::shared_ptr<drogon::orm::Transaction> transac
 
 LuaTransaction::~LuaTransaction() {
     if (transaction_ && !finished_) {
-        try {
-            // Rollback abandoned transactions to prevent accidental commits
-            transaction_->rollback();
-        } catch (...) {
-            // Never throw from a destructor
-        }
-        transaction_.reset();
+        // asynchronously rollback abandoned transactions to prevent accidental commits.
+        auto txn = transaction_;
         finished_ = true;
+        transaction_.reset();
+
+        txn->execSqlAsync(
+            "ROLLBACK",
+            [txn](const drogon::orm::Result&) {
+                // Asynchronous rollback completed
+            },
+
+            [txn](const drogon::orm::DrogonDbException& e) {
+                LOG_ERROR << "Transaction async rollback failed in destructor: " << e.base().what();
+            }
+        );
     }
 }
 
@@ -57,24 +64,48 @@ unsigned long long LuaTransaction::lastInsertId(const std::string& sql) {
 
 void LuaTransaction::commit() {
     ensureValid();
-    // Drogon commits automatically when Transaction is destroyed
-    finishTransaction();
+    // capture the transaction to keep it alive during the async operation
+    auto txn = transaction_;
+    finished_ = true;
+    transaction_.reset(); // Release our reference immediately
+
+    // execute COMMIT asynchronously to avoid blocking the Drogon event loop
+    txn->execSqlAsync(
+        "COMMIT",
+        [txn](const drogon::orm::Result&) {
+            // Commit successful. The transaction object will be safely destroyed 
+            // when the shared_ptr 'txn' goes out of scope in this callback.
+        },
+
+        [txn](const drogon::orm::DrogonDbException& e) {
+            LOG_ERROR << "Transaction commit failed: " << e.base().what();
+            // Attempt to rollback if commit failed to ensure clean DB state
+            txn->execSqlAsync("ROLLBACK", 
+                [](const drogon::orm::Result&) {}, 
+                [](const drogon::orm::DrogonDbException&) {});
+        }
+    );
 }
 
 void LuaTransaction::rollback() {
     if (!transaction_ || finished_)
         return;
 
-    try {
-        transaction_->rollback();
-    }
+    auto txn = transaction_;
+    finished_ = true;
+    transaction_.reset();
 
-    catch (const std::exception& e) {
-        finishTransaction();
-        throw std::runtime_error("Transaction rollback failed: " + std::string(e.what()));
-    }
+    // execute ROLLBACK asynchronously to avoid blocking the Drogon event loop
+    txn->execSqlAsync(
+        "ROLLBACK",
+        [txn](const drogon::orm::Result&) {
+            // Rollback successful
+        },
 
-    finishTransaction();
+        [txn](const drogon::orm::DrogonDbException& e) {
+            LOG_ERROR << "Transaction rollback failed: " << e.base().what();
+        }
+    );
 }
 
 void LuaTransaction::queryAsync(const std::string& sql, std::function<void(std::shared_ptr<LuaResult>)> callback, std::function<void(const std::string&)> errorCallback) {

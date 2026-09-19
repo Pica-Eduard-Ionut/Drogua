@@ -49,7 +49,6 @@ std::shared_ptr<LuaResult> LuaDatabase::query(const std::string& sql, const luab
     });
 }
 
-
 // Lua facing wrapper
 std::shared_ptr<LuaResult> LuaDatabase::queryLua(const std::string& sql, const luabridge::LuaRef& params) {
     return params.isNil() ? query(sql) : query(sql, params);
