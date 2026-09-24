@@ -4,7 +4,7 @@ project(drogua CXX)
 #========
 # Lua
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
+pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.5)
 
 # LuaBridge3
 include(FetchContent)

@@ -19,6 +19,7 @@ podman run --rm -it \
 set -e
 
     echo "==> Creating library directory"
+    rm -rf /drogon/app/lib
     mkdir -p /drogon/app/lib
 
     echo "==> Building application"
@@ -30,28 +31,28 @@ set -e
 
     echo "==> Copying runtime libraries"
 
-    cp /usr/lib/libcares.so.2 /drogon/app/lib/
-    cp /usr/lib/libjsoncpp.so.24 /drogon/app/lib/
-    cp /lib/libuuid.so.1 /drogon/app/lib/
-    cp /usr/lib/libpq.so.5 /drogon/app/lib/
-    cp /usr/lib/libmariadb.so.3 /drogon/app/lib/
-    cp /lib/libssl.so.1.1 /drogon/app/lib/
-    cp /lib/libcrypto.so.1.1 /drogon/app/lib/
-    cp /usr/lib/libsqlite3.so.0 /drogon/app/lib/
-    cp /usr/lib/libhiredis.so.1.0.0 /drogon/app/lib/
-    cp /lib/libz.so.1 /drogon/app/lib/
-    cp /usr/lib/libstdc++.so.6 /drogon/app/lib/
-    cp /usr/lib/libgcc_s.so.1 /drogon/app/lib/
-    cp /usr/lib/libldap_r-2.4.so.2 /drogon/app/lib/
-    cp /usr/lib/liblber-2.4.so.2 /drogon/app/lib/
-    cp /usr/lib/libsasl2.so.3 /drogon/app/lib/
+    ldd ./build/drogua \
+        | awk '\''
+            /=>/ && $3 ~ /^\// {
+                print $3
+            }
+            !/=>/ && $1 ~ /^\// {
+                print $1
+            }
+        '\'' \
+        | sort -u \
+        | while read -r lib; do
+            echo "    $lib"
+            cp -L "$lib" /drogon/app/lib/
+        done
 
-    # Lua 5.4
-    cp -L /usr/lib/lua5.4/liblua-5.4.so.0 /drogon/app/lib/
+    echo "==> Libraries copied:"
+    ls -lh /drogon/app/lib
 
     echo "==> Checking dependencies"
 
-    LD_LIBRARY_PATH=/drogon/app/lib ldd ./build/drogua
+    LD_LIBRARY_PATH=/drogon/app/lib \
+        ldd ./build/drogua
 
     echo "==> Build complete"
 '
