@@ -3,16 +3,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${SCRIPT_DIR}/drogua"
+LICENSES_DIR="${SCRIPT_DIR}/licenses"
 
 IMAGE="localhost/drogon-alpine:latest"
 CONTAINER_PROJECT="/drogon/app"
 
 echo "==> Building Drogua application"
 echo "Project: ${PROJECT_DIR}"
+echo "Licenses: ${LICENSES_DIR}"
 echo "Image:   ${IMAGE}"
 
 podman run --rm -it \
     -v="${PROJECT_DIR}:${CONTAINER_PROJECT}:Z,U" \
+    -v="${LICENSES_DIR}:${CONTAINER_PROJECT}/licenses:Z,U,ro" \
     -w="${CONTAINER_PROJECT}" \
     "${IMAGE}" \
     sh -lc '
@@ -54,5 +57,16 @@ set -e
     LD_LIBRARY_PATH=/drogon/app/lib \
         ldd ./build/drogua
 
+    echo "==> Licenses available:"
+    find /drogon/app/licenses -maxdepth 2 -type f -print
+
     echo "==> Build complete"
 '
+
+# reset permissions
+echo "==> Resetting file ownership"
+USER_ID="$(id -u)"
+GROUP_ID="$(id -g)"
+sudo chown -R "${USER_ID}:${GROUP_ID}" "${PROJECT_DIR}"
+echo "==> Ownership reset to ${USER_ID}:${GROUP_ID}"
+echo "==> Done"
