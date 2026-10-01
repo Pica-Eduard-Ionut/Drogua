@@ -65,6 +65,36 @@ Start with the [Application documentation](docs/app.md) to learn how to configur
 * [Database Row](docs/database-row.md)
 * [Database Transactions](docs/database-transaction.md)
 
+## Build
+Drogua is built using a containerized Alpine Linux environment with Drogon and all required build dependencies.
+
+### 1. Build the build environment
+
+From the repository root, build the Docker/Podman image:
+```bash
+podman build -t localhost/drogon-alpine:latest .
+```
+This only needs to be done once, or whenever the build environment changes.
+
+### 2. Build Drogua
+
+Run the build script:
+```bash
+./build.sh
+```
+The script will:
+- Build the Drogua application.
+- Run the test suite.
+- Copy the required runtime libraries into drogua/lib/.
+- Verify the application's runtime dependencies.
+
+### 3. Run Drogua
+After a successful build:
+```bash
+cd drogua
+podman compose up --build
+```
+
 ## Benchmarks
 
 Benchmark results comparing Drogua and FastAPI under the same HTTP routes and workload are available in the [benchmark documentation](benchmark.md).
